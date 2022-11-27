@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 This experiment was created using PsychoPy3 Experiment Builder (v2022.2.4),
-    on November 13, 2022, at 11:55
+    on Ноябрь 27, 2022, at 23:33
 If you publish work using this script the most relevant publication is:
 
     Peirce J, Gray JR, Simpson S, MacAskill M, Höchenberger R, Sogo H, Kastman E, Lindeløv JK. (2019) 
@@ -28,37 +28,39 @@ import sys  # to get file system encoding
 import psychopy.iohub as io
 from psychopy.hardware import keyboard
 
-
+SCREEN_NUMBER = 0
+SCREEN_SIZE = (1024, 768)
 
 # Ensure that relative paths start from the same directory as this script
-_thisDir = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_thisDir)
+_thisDirectory = os.path.dirname(os.path.abspath(__file__))
+os.chdir(_thisDirectory)
+
 # Store info about the experiment session
 psychopyVersion = '2022.2.4'
-expName = 'audio-oddball'  # from the Builder filename that created this script
-expInfo = {
-    'participant': f"{randint(0, 999999):06.0f}",
-    'session': '001',
+experimentName = 'audio-oddball'  # from the Builder filename that created this script
+experimentInfo = {
+    'Participant': f"{randint(0, 999999):06.0f}",
+    'Session': '001',
 }
 # --- Show participant info dialog --
-dlg = gui.DlgFromDict(dictionary=expInfo, sortKeys=False, title=expName)
-if dlg.OK == False:
+dialog = gui.DlgFromDict(dictionary=experimentInfo, sortKeys=False, title=experimentName)
+if dialog.OK == False:
     core.quit()  # user pressed cancel
-expInfo['date'] = data.getDateStr()  # add a simple timestamp
-expInfo['expName'] = expName
-expInfo['psychopyVersion'] = psychopyVersion
+experimentInfo['date'] = data.getDateStr()  # add a simple timestamp
+experimentInfo['experimentName'] = experimentName
+experimentInfo['psychopyVersion'] = psychopyVersion
 
 # Data file name stem = absolute path + name; later add .psyexp, .csv, .log, etc
-filename = _thisDir + os.sep + u'data/%s_%s_%s' % (expInfo['participant'], expName, expInfo['date'])
+dataFilename = _thisDirectory + os.sep + u'data/%s_%s_%s' % (experimentInfo['Participant'], experimentName, experimentInfo['date'])
 
 # An ExperimentHandler isn't essential but helps with data saving
-thisExp = data.ExperimentHandler(name=expName, version='',
-    extraInfo=expInfo, runtimeInfo=None,
-    originPath='C:\\Users\\User\\Documents\\PsychoPy Oddball\\oddball_task\\audio-oddball.py',
+thisExperiment = data.ExperimentHandler(name=experimentName, version='',
+    extraInfo=experimentInfo, runtimeInfo=None,
+    originPath=_thisDirectory + '\\audio-oddball.py',
     savePickle=True, saveWideText=True,
-    dataFileName=filename)
+    dataFileName=dataFilename)
 # save a log file for detail verbose info
-logFile = logging.LogFile(filename+'.log', level=logging.EXP)
+logFile = logging.LogFile(dataFilename+'.log', level=logging.EXP)
 logging.console.setLevel(logging.WARNING)  # this outputs to the screen, not a file
 
 endExpNow = False  # flag for 'escape' or other condition => quit the exp
@@ -68,16 +70,16 @@ frameTolerance = 0.001  # how close to onset before 'same' frame
 
 # --- Setup the Window ---
 win = visual.Window(
-    size=(1024, 768), fullscr=True, screen=0, 
+    size=SCREEN_SIZE, fullscr=False, screen=SCREEN_NUMBER, 
     winType='pyglet', allowStencil=False,
     monitor='testMonitor', color=[0,0,0], colorSpace='rgb',
     blendMode='avg', useFBO=True, 
     units='height')
 win.mouseVisible = False
 # store frame rate of monitor if we can measure it
-expInfo['frameRate'] = win.getActualFrameRate()
-if expInfo['frameRate'] != None:
-    frameDur = 1.0 / round(expInfo['frameRate'])
+experimentInfo['frameRate'] = win.getActualFrameRate()
+if experimentInfo['frameRate'] != None:
+    frameDur = 1.0 / round(experimentInfo['frameRate'])
 else:
     frameDur = 1.0 / 60.0  # could not measure, so guess
 # --- Setup input devices ---
@@ -87,8 +89,8 @@ ioConfig = {}
 ioConfig['Keyboard'] = dict(use_keymap='psychopy')
 
 ioSession = '1'
-if 'session' in expInfo:
-    ioSession = str(expInfo['session'])
+if 'session' in experimentInfo:
+    ioSession = str(experimentInfo['session'])
 ioServer = io.launchHubServer(window=win, **ioConfig)
 eyetracker = None
 
@@ -159,12 +161,12 @@ routineTimer.reset()
 win.flip()
 
 # these shouldn't be strictly necessary (should auto-save)
-thisExp.saveAsWideText(filename+'.csv', delim='auto')
-thisExp.saveAsPickle(filename)
+thisExperiment.saveAsWideText(dataFilename+'.csv', delim='auto')
+thisExperiment.saveAsPickle(dataFilename)
 logging.flush()
 # make sure everything is closed down
 if eyetracker:
     eyetracker.setConnectionState(False)
-thisExp.abort()  # or data files will save again on exit
+thisExperiment.abort()  # or data files will save again on exit
 win.close()
 core.quit()
