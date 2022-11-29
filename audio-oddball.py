@@ -36,6 +36,9 @@ WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 768
 SCREEN_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
 EXPERIMENT_NAME = 'audio-oddball'
+START_TEXT = 'Здравствуйте!\
+Выполняйте задание клавиатурного тренажёра.\
+Не обращайте внимания на сигналы'
 
 # Number of standard
 STANDARD_NUMBER = 7
@@ -52,30 +55,33 @@ MARK_SIZE = 20
 
 WINDOW = None
 
+_thisDirectory = ''
 
 #========================================================
 # Low Level Functions
 #========================================================
 def CreateSequence(standardNumber, oddNumber, cyclesNumber=1):
     sequence = []
-    
     for i in range(cyclesNumber):
         for j in range(standardNumber):
             sequence.append(0)
         
         for f in range(oddNumber):
             sequence.append(1)
-        
-    #sequence.append([0 for x in range(standardNumber)])
-    #sequence.append([1 for x in range(oddNumber)])
-    #sequence = listFlatten(sequence)
     random.seed(datetime.datetime.now().timestamp())
     random.shuffle(sequence) # shuffles in-place
 
-    for element in sequence:
-        print(element)
-
     return sequence
+
+def GetThisDirectory():
+    global _thisDirectory
+    
+    if not _thisDirectory:
+        # Ensure that relative paths start from the same directory as this script
+        _thisDirectory = os.path.dirname(os.path.abspath(__file__))
+        os.chdir(_thisDirectory)
+
+    return _thisDirectory
 
 def InitSessionInfo(experimentName):
     # Store info about the experiment session
@@ -113,15 +119,17 @@ def GetExperimentHandler(experimentInfo, experimentName, dataFilename):
     logging.console.setLevel(logging.WARNING)  # this outputs to the screen, not a file
 
     return thisExperiment
-
-def CreateFixationStimulus(window):
+    
+def CreateTextStimulus(window, text):
     fixation = visual.TextStim(window, 
-        '+',
+        text,
         color='White', 
-        #colorSpace='rgb',  
         pos = (0, 0))
     
     return fixation
+
+def CreateFixationStimulus(window):    
+    return CreateTextStimulus(window, '+')
     
 def CreatePhotosensor(window, size=15):
     photosensor = visual.Rect(
@@ -138,11 +146,107 @@ def CreatePhotosensor(window, size=15):
     
     return photosensor
 
+def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10000):
+    endExperimentNow = False  # flag for 'escape' or other condition => quit the exp
+    continueRoutine = True
+    routineForceEnded = False
+
+    sound = soundInfo[0]
+    # update component parameters for each repeat
+    #sound_2.setSound('C:/Users/yulia.sazonova/Desktop/oddball/oddball_task/white-noise44.wav', hamming=True)
+    #sound_2.setVolume(1.0, log=False)
+    # keep track of which components have finished
+    trialComponents = [sound]
+    
+    for visual in visuals:
+        trialComponents.append(visual[0])
+    
+    for thisComponent in trialComponents:
+        thisComponent.tStart = None
+        thisComponent.tStop = None
+        thisComponent.tStartRefresh = None
+        thisComponent.tStopRefresh = None
+        if hasattr(thisComponent, 'status'):
+            thisComponent.status = NOT_STARTED
+    # reset timers
+    t = 0
+    _timeToFirstFrame = window.getFutureFlipTime(clock="now")
+    frameN = -1
+
+    # --- Run Routine "trial2" ---
+    while continueRoutine and routineTimer.getTime() < time:
+        # get current time
+        t = routineTimer.getTime()
+        tThisFlip = window.getFutureFlipTime(clock=routineTimer)
+        tThisFlipGlobal = window.getFutureFlipTime(clock=None)
+        frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
+        # update/draw components on each frame
+        # start/stop sound
+        if sound.status == NOT_STARTED and tThisFlip >= 0.0-frameTolerance:
+            # keep track of start time/frame for later
+            sound.frameNStart = frameN  # exact frame index
+            sound.tStart = t  # local t and not account for scr refresh
+            sound.tStartRefresh = tThisFlipGlobal  # on global time
+            # add timestamp to datafile
+            if soundInfo[1]:
+                thisExperiment.addData(soundInfo[2] + '.started', tThisFlipGlobal)
+            sound.play(when=window)  # sync with win flip
+            
+        # *visuals* updates
+        for visualInfo in visuals:
+            visual = visualInfo[0]
+            if visual.status == NOT_STARTED and tThisFlip >= 0.0-frameTolerance:
+                # keep track of start time/frame for later
+                visual.frameNStart = frameN  # exact frame index
+                visual.tStart = t  # local t and not account for scr refresh
+                visual.tStartRefresh = tThisFlipGlobal  # on global time
+                window.timeOnFlip(visual, 'tStartRefresh')  # time at next scr refresh
+                # add timestamp to datafile
+                if (visualInfo[1]):
+                    thisExperiment.timestampOnFlip(window, visualInfo[2] + '.started')
+            visual.setAutoDraw(True)
+            
+            if visual.status == STARTED:
+                # is it time to stop? (based on global clock, using actual start)
+                if tThisFlipGlobal > visual.tStartRefresh + 1.0-frameTolerance:
+                    # keep track of stop time/frame for later
+                    visual.tStop = t  # not accounting for scr refresh
+                    visual.frameNStop = frameN  # exact frame index
+                    # add timestamp to datafile
+                    if (visualInfo[1]):
+                        thisExperiment.timestampOnFlip(window, visualInfo[2] + '.stopped')
+                    visual.setAutoDraw(False)
+                # check for quit (typically the Esc key)
+                
+        if endExperimentNow or defaultKeyboard.getKeys(keyList=["escape"]):
+            core.quit()
+    
+        # check if all components have finished
+        if not continueRoutine:  # a component has requested a forced-end of Routine
+            routineForceEnded = True
+            break
+        continueRoutine = False  # will revert to True if at least one component still running
+        for thisComponent in trialComponents:
+            if hasattr(thisComponent, "status") and thisComponent.status != FINISHED:
+                continueRoutine = True
+                break  # at least one component has not yet finished
+    
+        # refresh the screen
+        if continueRoutine:  # don't flip if this routine is over or we'll get a blank screen
+            window.flip()
+
+    # --- Ending Routine "trial2" ---
+    for thisComponent in trialComponents:
+        if hasattr(thisComponent, "setAutoDraw"):
+            thisComponent.setAutoDraw(False)
+    sound.stop()  # ensure sound has stopped at end of routine
+    # the Routine "trial2" was not non-slip safe, so reset the non-slip timer
+    routineTimer.reset()
+
 # Main Scenario
 if __name__ == "__main__": 
-    # Ensure that relative paths start from the same directory as this script
-    thisDirectory = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(thisDirectory)
+    thisDirectory = GetThisDirectory()
+    print(thisDirectory)
 
     experimentName = EXPERIMENT_NAME
     psychopyVersion = '2022.2.4'
@@ -171,13 +275,30 @@ if __name__ == "__main__":
         units='height')
     window.mouseVisible = False
     
-    stim = CreateFixationStimulus(window)
+    fixation = CreateFixationStimulus(window)
+    startText = CreateTextStimulus(window, START_TEXT)
     
     CreateSequence(STANDARD_NUMBER, ODD_NUMBER)
 
     size = MARK_SIZE
     bg_color = [1, 1, 1]
     photosensor = CreatePhotosensor(window)
+    
+    startInstructionFile = thisDirectory + '\\Start.wav'
+    startInstructionsSound = sound.Sound(startInstructionFile, secs=-1, stereo=True, hamming=True, name='startInstructionsSound')
+    startInstructionsSound.setVolume(1.0)
+    startInstructionsSound.setSound(startInstructionFile, secs=-1, hamming=False)
+    startInstructionsSound.setVolume(1.0, log=False)
+
+    oddAudioFile = thisDirectory + '\\pink-noise.wav'
+    standartAudioFile = thisDirectory + '\\white-noise.wav'
+
+    standardSound = sound.Sound(standartAudioFile, secs=8, stereo=True, hamming=True,
+        name='standardSound')
+    standardSound.setVolume(8.0)
+    standardSound.setSound(standartAudioFile, secs=-1, hamming=False)
+    standardSound.setVolume(8.0, log=False)
+
     # store frame rate of monitor if we can measure it
     experimentInfo['frameRate'] = window.getActualFrameRate()
     if experimentInfo['frameRate'] != None:
@@ -204,7 +325,15 @@ if __name__ == "__main__":
     # Create some handy timers
     globalClock = core.Clock()  # to track the time since experiment started
     routineTimer = core.Clock()  # to track time remaining of each (possibly non-slip) routine 
-
+    
+    startSoundInfo = (startInstructionsSound, True, 'startInstruction')
+    visualsInfo = [(startText, False, '')]
+    RunTrial(window, thisExperiment, startSoundInfo, visualsInfo, routineTimer)
+    
+    standardSoundInfo = (standardSound, True, 'startInstruction')
+    visualsInfo = [(fixation, False, '')]
+    RunTrial(window, thisExperiment, standardSoundInfo, visualsInfo, routineTimer, 8)
+    '''
     # --- Prepare to start Routine "trial" ---
     continueRoutine = True
     routineForceEnded = False
@@ -222,13 +351,13 @@ if __name__ == "__main__":
     t = 0
     _timeToFirstFrame = window.getFutureFlipTime(clock="now")
     frameN = -1
-
     # --- Run Routine "trial" ---
     while continueRoutine:
         # get current time
         t = routineTimer.getTime()
         tThisFlip = window.getFutureFlipTime(clock=routineTimer)
         tThisFlipGlobal = window.getFutureFlipTime(clock=None)
+                
         frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
         # update/draw components on each frame
             
@@ -254,6 +383,8 @@ if __name__ == "__main__":
             stim.draw()
             photosensor.draw()
             window.flip()
+            standardSound.play()
+            #standardSound.stop()
 
     # --- Ending Routine "trial" ---
     for thisComponent in trialComponents:
@@ -267,6 +398,7 @@ if __name__ == "__main__":
     # and win.timeOnFlip() tasks get executed before quitting
     window.flip()
 
+    '''
     # these shouldn't be strictly necessary (should auto-save)
     thisExperiment.saveAsWideText(dataFilename+'.csv', delim='auto')
     thisExperiment.saveAsPickle(dataFilename)
