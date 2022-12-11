@@ -11,7 +11,7 @@ If you publish work using this script the most relevant publication is:
 
 """
 
-# --- Import packages ---
+# Import packages
 from psychopy import locale_setup
 from psychopy import prefs
 from psychopy import sound, gui, visual, core, data, event, logging, clock, colors, layout
@@ -28,6 +28,9 @@ import pylsl
 import random
 import datetime
 
+from collections import namedtuple
+from enum import Enum
+
 import psychopy.iohub as io
 from psychopy.hardware import keyboard
 
@@ -41,11 +44,13 @@ START_TEXT = 'Здравствуйте!\
 Не обращайте внимания на сигналы'
 
 # Number of standard
-STANDARD_NUMBER = 7
-ODD_NUMBER = 3
+STANDARD_MIN_NUMBER = 3
+STANDARD_MAX_NUMBER = 7
+ODD_NUMBER = 1
 CYCLES_NUMBER = 3
+STIMULUS_SERIES_NUMBER = 30
 
-#Colors
+# Colors
 BACKGROUND_COLOR = 'Black'
 FIXATION_COLOR = 'White'
 
@@ -53,14 +58,25 @@ FIXATION_COLOR = 'White'
 FIXATION_SIZE = 20
 MARK_SIZE = 20
 
+# Use default
 WINDOW = None
 
 _thisDirectory = ''
 
+
+ 
+class StimulusType(Enum):
+    STANDARD = 0
+    ODD = 1
+
+# Declaring namedtuple()
+Range = namedtuple('Range', ['Min', 'Max'])
+StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration'])
+
 #========================================================
 # Low Level Functions
 #========================================================
-def CreateSequence(standardNumber, oddNumber, cyclesNumber=1):
+def CreateStandardSequence(standardNumber, oddNumber, cyclesNumber=1):
     sequence = []
     for i in range(cyclesNumber):
         for j in range(standardNumber):
@@ -72,6 +88,42 @@ def CreateSequence(standardNumber, oddNumber, cyclesNumber=1):
     random.shuffle(sequence) # shuffles in-place
 
     return sequence
+
+def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400, standardTimeRange=Range(700, 900), oddTime=400):
+    sequence = []
+    
+    random.seed(datetime.datetime.now().timestamp())
+    i = 0
+
+    print("hello")
+    print(f"standardRange = {standardRange}, oddNumber = {oddNumber}, stimulusNumber = {stimulusNumber}, standardTime = {standardTime}, str = {standardTimeRange}, oddTime = {oddTime}")
+
+    while i < stimulusNumber:
+        # Add Standard
+        print(f'i = {i}')
+        standardNumber = random.randint(standardRange.Min, standardRange.Max)
+        standardTimes = [standardTime] * (standardNumber - standardRange.Min)
+
+        for j in range(standardRange.Min):
+            print(f'j1 = {j}')
+            standardTimes.append(random.randint(standardTimeRange.Min, standardTimeRange.Max))
+        random.shuffle(standardTimes)
+
+        for j in range(standardNumber):
+            print(f'j2 = {j}')
+            sequence.append(StimulusInfo(StimulusType.STANDARD, standardTimes[j]))
+            i += 1
+        
+        for j in range(oddNumber):
+            print(f'j3 = {j}')
+            sequence.append(StimulusInfo(StimulusType.ODD, oddTime))
+            i += 1
+
+    for i in range(stimulusNumber):
+        print(f'({sequence[i]})')
+
+    return sequence
+
 
 def GetThisDirectory():
     global _thisDirectory
@@ -247,6 +299,9 @@ def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10
 if __name__ == "__main__": 
     thisDirectory = GetThisDirectory()
     print(thisDirectory)
+    
+    CreateSequence(Range(STANDARD_MIN_NUMBER, STANDARD_MAX_NUMBER), ODD_NUMBER, STIMULUS_SERIES_NUMBER)
+    print("hiiii!")
 
     experimentName = EXPERIMENT_NAME
     psychopyVersion = '2022.2.4'
@@ -278,7 +333,6 @@ if __name__ == "__main__":
     fixation = CreateFixationStimulus(window)
     startText = CreateTextStimulus(window, START_TEXT)
     
-    CreateSequence(STANDARD_NUMBER, ODD_NUMBER)
 
     size = MARK_SIZE
     bg_color = [1, 1, 1]
