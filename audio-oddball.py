@@ -40,6 +40,7 @@ WINDOW_HEIGHT = 768
 SCREEN_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
 EXPERIMENT_NAME = 'audio-oddball'
 START_TEXT = 'Здравствуйте!\
+\
 Выполняйте задание клавиатурного тренажёра.\
 Не обращайте внимания на сигналы'
 
@@ -49,6 +50,14 @@ STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
 CYCLES_NUMBER = 3
 STIMULUS_SERIES_NUMBER = 30
+
+# Marks
+STANDARD_MARK = "Standard"
+ODD_MARK = "Odd"
+
+# LSL
+STANDARD_LSL = 111
+ODD_LSL = 123
 
 # Colors
 BACKGROUND_COLOR = 'Black'
@@ -71,7 +80,7 @@ class StimulusType(Enum):
 
 # Declaring namedtuple()
 Range = namedtuple('Range', ['Min', 'Max'])
-StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration'])
+StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration', 'Name', 'LSL', 'WriteLog'])
 
 #========================================================
 # Low Level Functions
@@ -105,24 +114,21 @@ def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400
         standardTimes = [standardTime] * (standardNumber - standardRange.Min)
 
         for j in range(standardRange.Min):
-            print(f'j1 = {j}')
             standardTimes.append(random.randint(standardTimeRange.Min, standardTimeRange.Max))
         random.shuffle(standardTimes)
 
         for j in range(standardNumber):
-            print(f'j2 = {j}')
-            sequence.append(StimulusInfo(StimulusType.STANDARD, standardTimes[j]))
+            sequence.append(StimulusInfo(StimulusType.STANDARD, standardTimes[j], STANDARD_MARK, STANDARD_LSL, True))
             i += 1
         
         for j in range(oddNumber):
-            print(f'j3 = {j}')
-            sequence.append(StimulusInfo(StimulusType.ODD, oddTime))
+            sequence.append(StimulusInfo(StimulusType.ODD, oddTime, ODD_MARK, ODD_LSL, True))
             i += 1
 
     for i in range(stimulusNumber):
         print(f'({sequence[i]})')
 
-    return sequence
+    return sequence[:stimulusNumber]
 
 
 def GetThisDirectory():
@@ -174,8 +180,11 @@ def GetExperimentHandler(experimentInfo, experimentName, dataFilename):
     
 def CreateTextStimulus(window, text):
     fixation = visual.TextStim(window, 
-        text,
-        color='White', 
+        text = text,
+        font='Open Sans', 
+        height=0.05, 
+        color='White',
+        languageStyle='LTR',
         pos = (0, 0))
     
     return fixation
@@ -197,6 +206,113 @@ def CreatePhotosensor(window, size=15):
         )
     
     return photosensor
+
+def RunCustomTrial(text, sound, time=0.4):
+    continueRoutine = True
+    routineForceEnded = False
+    hasText = text != None
+    hasSound = sound != None
+
+    # keep track of which components have finished
+    components = []
+    if hasText:
+        components.append(text)
+    if hasSound:
+        components.append(sound)
+
+    for thisComponent in components:
+        thisComponent.tStart = None
+        thisComponent.tStop = None
+        thisComponent.tStartRefresh = None
+        thisComponent.tStopRefresh = None
+        if hasattr(thisComponent, 'status'):
+            thisComponent.status = NOT_STARTED
+    # reset timers
+    t = 0
+    _timeToFirstFrame = window.getFutureFlipTime(clock="now")
+    frameN = -1
+    
+    # --- Run Routine ---
+    while continueRoutine and routineTimer.getTime() < time:
+        # get current time
+        t = routineTimer.getTime()
+        tThisFlip = window.getFutureFlipTime(clock=routineTimer)
+        tThisFlipGlobal = window.getFutureFlipTime(clock=None)
+        frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
+        # update/draw components on each frame
+        
+        # *text* updates
+        if hasText:
+            if text.status == NOT_STARTED and tThisFlip >= 0.0 - frameTolerance:
+                # keep track of start time/frame for later
+                text.frameNStart = frameN  # exact frame index
+                text.tStart = t  # local t and not account for scr refresh
+                text.tStartRefresh = tThisFlipGlobal  # on global time
+                window.timeOnFlip(text, 'tStartRefresh')  # time at next scr refresh
+                # add timestamp to datafile
+                thisExperiment.timestampOnFlip(window, 'text.started')
+                text.setAutoDraw(True)
+            if text.status == STARTED:
+                # is it time to stop? (based on global clock, using actual start)
+                if tThisFlipGlobal > text.tStartRefresh + time - frameTolerance:
+                    # keep track of stop time/frame for later
+                    text.tStop = t  # not accounting for scr refresh
+                    text.frameNStop = frameN  # exact frame index
+                    # add timestamp to datafile
+                    thisExperiment.timestampOnFlip(window, 'text.stopped')
+                    text.setAutoDraw(False)
+        
+        if hasSound:
+            # start/stop sound
+            if sound.status == NOT_STARTED and tThisFlip >= 0.0-frameTolerance:
+                # keep track of start time/frame for later
+                sound.frameNStart = frameN  # exact frame index
+                sound.tStart = t  # local t and not account for scr refresh
+                sound.tStartRefresh = tThisFlipGlobal  # on global time
+                # add timestamp to datafile
+                thisExperiment.addData('sound.started', tThisFlipGlobal)
+                sound.play(when=window)  # sync with win flip
+            if sound.status == STARTED:
+                # is it time to stop? (based on global clock, using actual start)
+                if tThisFlipGlobal > sound.tStartRefresh + time - frameTolerance:
+                    # keep track of stop time/frame for later
+                    sound.tStop = t  # not accounting for scr refresh
+                    sound.frameNStop = frameN  # exact frame index
+                    # add timestamp to datafile
+                    thisExperiment.timestampOnFlip(window, 'sound.stopped')
+                    sound.stop()
+        
+            # check for quit (typically the Esc key)
+        if defaultKeyboard.getKeys(keyList=["escape"]):
+            core.quit()
+        
+        # check if all components have finished
+        if not continueRoutine:  # a component has requested a forced-end of Routine
+            routineForceEnded = True
+            break
+        continueRoutine = False  # will revert to True if at least one component still running
+        for thisComponent in components:
+            if hasattr(thisComponent, "status") and thisComponent.status != FINISHED:
+                continueRoutine = True
+                break  # at least one component has not yet finished
+        
+        # refresh the screen
+        if continueRoutine:  # don't flip if this routine is over or we'll get a blank screen
+            window.flip()
+    
+    # --- Ending Routine "StandardStimulus" ---
+    for thisComponent in components:
+        if hasattr(thisComponent, "setAutoDraw"):
+            thisComponent.setAutoDraw(False)
+    if hasSound:
+        sound.stop()  # ensure sound has stopped at end of routine
+
+    # using non-slip timing so subtract the expected duration of this Routine (unless ended on request)
+    if routineForceEnded:
+        routineTimer.reset()
+    else:
+        routineTimer.addTime(-time)
+    
 
 def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10000):
     endExperimentNow = False  # flag for 'escape' or other condition => quit the exp
@@ -294,7 +410,7 @@ def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10
     sound.stop()  # ensure sound has stopped at end of routine
     # the Routine "trial2" was not non-slip safe, so reset the non-slip timer
     routineTimer.reset()
-
+   
 # Main Scenario
 if __name__ == "__main__": 
     thisDirectory = GetThisDirectory()
@@ -387,6 +503,13 @@ if __name__ == "__main__":
     standardSoundInfo = (standardSound, True, 'startInstruction')
     visualsInfo = [(fixation, False, '')]
     RunTrial(window, thisExperiment, standardSoundInfo, visualsInfo, routineTimer, 8)
+    # update component parameters for each repeat
+    standardSound.setSound('C:/Users/yulia.sazonova/Desktop/oddball/oddball_task/pink-noise.wav', secs=0.4, hamming=True)
+    standardSound.setVolume(1.0, log=False)
+    RunCustomTrial(fixation, standardSound)
+    RunCustomTrial(fixation, None, 10)
+    RunCustomTrial(fixation, standardSound)
+    RunCustomTrial(fixation, None, 10)
     '''
     # --- Prepare to start Routine "trial" ---
     continueRoutine = True
