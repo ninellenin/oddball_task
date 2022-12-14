@@ -24,7 +24,7 @@ from numpy import (sin, cos, tan, log, log10, pi, average,
 from numpy.random import random, randint, normal, shuffle, choice as randchoice
 import os  # handy system and path functions
 import sys  # to get file system encoding
-import pylsl
+from pylsl import StreamInfo, StreamOutlet
 import random
 import datetime
 
@@ -40,15 +40,19 @@ WINDOW_HEIGHT = 768
 SCREEN_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
 EXPERIMENT_NAME = 'audio-oddball'
 START_TEXT = 'Здравствуйте!\n\
-Выполняйте задание клавиатурного тренажёра.\
-Не обращайте внимания на сигналы. Нажмите "Enter", чтобы начать'
+Выполняйте задание клавиатурного тренажёра.\n\
+Не обращайте внимания на сигналы.\n Нажмите "Enter", чтобы начать'
+COUNT_TEXT = 'Теперь вам нужно посчитать количество отклоняющихся сигналов\n\
+Продолжайте выполнять задание клавиатурного тренажёра.\n\
+Нажмите "Enter", чтобы начать'
+ENTER_COUNT_TEXT = 'Введите количество отклоняющихся сигналов'
 
 # Number of standard
 STANDARD_MIN_NUMBER = 3
 STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
-CYCLES_NUMBER = 3
 STIMULUS_SERIES_NUMBER = 10 #30
+CYCLES_NUMBER = 2#4
 
 # Times
 ODD_TIME = 400
@@ -57,14 +61,17 @@ STANDARD_TIME_MIN = 700
 STANDARD_TIME_MAX = 900
 PAUSE_TIME_MIN = 1000 #6000 ms
 PAUSE_TIME_MAX = 3000 #30000 ms
+CYCLE_PAUSE = 3000 #30000 ms
 
 # Marks
 STANDARD_MARK = "Standard"
 ODD_MARK = "Odd"
 
 # LSL
-STANDARD_LSL = 111
-ODD_LSL = 123
+STANDARD_START_LSL = 111
+STANDARD_END_LSL = 112
+ODD_START_LSL = 123
+ODD_END_LSL = 124
 
 # Colors
 BACKGROUND_COLOR = 'Black'
@@ -88,10 +95,17 @@ _ioSession = None
 _ioServer = None
 _eyetracker = None
 _ioConfig = None
+_lslOutlet = None
 
-_startInstructionSound = None
+_startInstructionsSound = None
 _oddSound = None
 _standardSound = None
+_countIntructionsSound = None
+_enterCountIntrustions = None
+
+_fixation = None
+_fixationInfo = None
+_cyclePauseInfo = None
  
 class StimulusType(Enum):
     STANDARD = 0
@@ -101,7 +115,7 @@ class StimulusType(Enum):
 
 # Declaring namedtuple()
 Range = namedtuple('Range', ['Min', 'Max'])
-StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration', 'Name', 'LSL', 'WriteLog'], defaults=(None,) * 5)
+StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration', 'Name', 'LSLStart', 'LSLEnd', 'WriteLog'], defaults=(StimulusType.NONE, None, None, -1, -1, False))
 
 #========================================================
 # Low Level Functions
@@ -139,11 +153,11 @@ def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400
         random.shuffle(standardTimes)
 
         for j in range(standardNumber):
-            sequence.append(StimulusInfo(StimulusType.STANDARD, MS_TO_S * standardTimes[j], STANDARD_MARK, STANDARD_LSL, True))
+            sequence.append(StimulusInfo(StimulusType.STANDARD, MS_TO_S * standardTimes[j], STANDARD_MARK, STANDARD_START_LSL, STANDARD_END_LSL, True))
             i += 1
         
         for j in range(oddNumber):
-            sequence.append(StimulusInfo(StimulusType.ODD, MS_TO_S * oddTime, ODD_MARK, ODD_LSL, True))
+            sequence.append(StimulusInfo(StimulusType.ODD, MS_TO_S * oddTime, ODD_MARK, ODD_START_LSL, ODD_END_LSL, True))
             i += 1
 
     for i in range(stimulusNumber):
@@ -172,6 +186,15 @@ def GetThisDirectory():
 
     return _thisDirectory
 
+def InitLslStream():
+    global _lslOutlet
+
+    lslInfo = StreamInfo(name='stream_name', type='Markers', channel_count=1,
+                  channel_format='int32', source_id='uniqueid12345')
+    # Initialize the stream.
+    _lslOutlet = StreamOutlet(lslInfo)
+
+
 def InitSessionInfo(experimentName):
     # Store info about the experiment session
     experimentInfo = {
@@ -195,6 +218,16 @@ def ShowStartDialog(experimentInfo, experimentName, psychopyVersion):
     dataFilename = thisDirectory + os.sep + u'data/%s_%s_%s' % (experimentInfo['Participant'], experimentName, experimentInfo['date'])
 
     return dataFilename
+
+def ShowCountDialog():
+    text = 'Количество'
+    dictionary = {
+        text: ""
+    }
+
+    dialog = gui.DlgFromDict(dictionary=dictionary, sortKeys=False, title=ENTER_COUNT_TEXT)
+
+    return dictionary[text]
 
 def GetExperimentHandler(experimentInfo, experimentName, dataFilename):
     # An ExperimentHandler isn't essential but helps with data saving
@@ -238,7 +271,7 @@ def CreatePhotosensor(window, size=15):
     
     return photosensor
 
-def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInput=False):
+def RunTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInput=False):
     global _routineTimer
 
     continueRoutine = True
@@ -311,6 +344,8 @@ def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInpu
                 # add timestamp to datafile
                 if soundStimulusInfo.WriteLog:
                     thisExperiment.addData(soundStimulusInfo.Name +'.started', tThisFlipGlobal)
+                if soundStimulusInfo.LSLStart != -1:
+                    _lslOutlet.push_sample(x=[soundStimulusInfo.LSLStart])
                 sound.play(when=window)  # sync with win flip
             if sound.status == STARTED:
                 # is it time to stop? (based on global clock, using actual start)
@@ -321,6 +356,8 @@ def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInpu
                     # add timestamp to datafile
                     if soundStimulusInfo.WriteLog:
                         thisExperiment.timestampOnFlip(window, soundStimulusInfo.Name +'.stopped')
+                    if soundStimulusInfo.LSLEnd != -1:
+                        _lslOutlet.push_sample(x=[soundStimulusInfo.LSLEnd])
                     sound.stop()
         
         # check for quit (typically the Esc key)
@@ -368,10 +405,14 @@ def GetSound(localPath, name):
 
 def InitializeSounds():
     global _startInstructionsSound
+    global _countIntructionsSound
+    global _enterCountIntrustions
     global _oddSound 
     global _standardSound
 
-    _startInstructionsSound = GetSound('\\Start.wav', 'startInstructionsSound')
+    _startInstructionsSound = GetSound('\\start-instructions.wav', 'startInstructionsSound')
+    _countIntructionsSound = GetSound('\\continue-instructions.wav', 'continueInstructionsSound')
+    _enterCountIntrustions = GetSound('\\enter-count-instructions.wav', 'enterCountInstructionsSound')
     _oddSound = GetSound('\\pink-noise.wav', ODD_MARK)
     _standardSound = GetSound('\\white-noise.wav', STANDARD_MARK)
 
@@ -409,18 +450,71 @@ def StoreCurrentExperimentInfo(experimentInfo):
     _globalClock = core.Clock()  # to track the time since experiment started
     _routineTimer = core.Clock()  # to track time remaining of each (possibly non-slip) routine 
     
+def GetSequences(cyclesNumber):
+    stimuliSequence = []
+    pauseSequence = []
+    
+    for i in range(cyclesNumber):
+        stimuliSequence.append(CreateSequence(Range(STANDARD_MIN_NUMBER, STANDARD_MAX_NUMBER), ODD_NUMBER, STIMULUS_SERIES_NUMBER))
+        pauseSequence.append(CreatePauseSequence(STIMULUS_SERIES_NUMBER, Range(PAUSE_TIME_MIN, PAUSE_TIME_MAX)))
+
+    return stimuliSequence, pauseSequence
+
+def InitialzeStimulus(window):
+    global _fixation
+    global _fixationInfo
+    global _cyclePauseInfo
+
+    _fixation = CreateFixationStimulus(window)
+    _fixationInfo = StimulusInfo(
+        Type = StimulusType.NONE, 
+        Duration = -1,
+        WriteLog = False)
+    _fixation = CreateFixationStimulus(window)
+    _cyclePauseInfo = StimulusInfo(
+        Type = StimulusType.NONE, 
+        Duration = MS_TO_S * CYCLE_PAUSE,
+        Name = "Cycle pause",
+        WriteLog = True)
+
+def RunOddball(stimuli, pauses, test=True):
+    results = []
+    oddCount = 0
+
+    for i in range(CYCLES_NUMBER):
+        oddCount = 0
+
+        # Cycle
+        for j in range(STIMULUS_SERIES_NUMBER):
+            stimulusInfo = stimuli[i][j]
+            if stimulusInfo.Type == StimulusType.STANDARD:
+                sound = _standardSound
+            else:
+                sound = _oddSound
+                oddCount += 1
+            RunTrial(_fixation, pauses[i][j], None, None)
+            RunTrial(_fixation, _fixationInfo, sound, stimulusInfo)
+
+        # Pause between cycles
+        if not test:
+            results.append((oddCount, ShowCountDialog()))
+        
+        RunTrial(_fixation, _cyclePauseInfo, None, None)
+    
+    return results
 
 # Main Scenario
 if __name__ == "__main__": 
     thisDirectory = GetThisDirectory()
     print(thisDirectory)
     
-    stimuliInfo = CreateSequence(Range(STANDARD_MIN_NUMBER, STANDARD_MAX_NUMBER), ODD_NUMBER, STIMULUS_SERIES_NUMBER)
-    pauseInfo = CreatePauseSequence(STIMULUS_SERIES_NUMBER, Range(PAUSE_TIME_MIN, PAUSE_TIME_MAX))
+    testStimuliSequences, testPauseSequence = GetSequences(CYCLES_NUMBER)
+    trainStimuliSequences, trainPauseSequence = GetSequences(CYCLES_NUMBER)
 
     experimentName = EXPERIMENT_NAME
     psychopyVersion = '2022.2.4'
     experimentInfo = InitSessionInfo(experimentName)
+    InitLslStream()
 
     dataFilename = ShowStartDialog(experimentInfo, experimentName, psychopyVersion)
 
@@ -443,26 +537,34 @@ if __name__ == "__main__":
         useFBO=True, 
         units='height')
     window.mouseVisible = False
-    
-    fixation = CreateFixationStimulus(window)
-    startText = CreateTextStimulus(window, START_TEXT)
-    startInstructionsSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=True, Name='startInstruction', Duration=1000000)
-    photosensor = CreatePhotosensor(window)
-    
-    InitializeSounds()
     StoreCurrentExperimentInfo(experimentInfo)
-    RunCustomTrial(startText, StimulusInfo(StimulusType.NONE, WriteLog=False), _startInstructionsSound, startInstructionsSoundInfo, True)
+    
+    startText = CreateTextStimulus(window, START_TEXT)
+    countText = CreateTextStimulus(window, COUNT_TEXT)
+    instructionsTextInfo = StimulusInfo(StimulusType.NONE, WriteLog=False)
+    instructionsSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=True, Name='startInstruction', Duration=1000000)
+    photosensor = CreatePhotosensor(window)
+    InitialzeStimulus(window)
+    InitializeSounds()
 
-    fixationInfo = StimulusInfo(
-        Type = StimulusType.NONE, 
-        Duration = -1,
-        WriteLog = False)
+    print("Run start")
+    # Show start instuctions
+    RunTrial(startText, instructionsTextInfo, _startInstructionsSound, instructionsSoundInfo, True)
 
-    for i in range(STIMULUS_SERIES_NUMBER):
-        stimulusInfo = stimuliInfo[i]
-        sound = _standardSound if stimulusInfo.Type == StimulusType.STANDARD else _oddSound
-        RunCustomTrial(fixation, fixationInfo, sound, stimuliInfo[i])
-        RunCustomTrial(fixation, pauseInfo[i], None, None)
+    # Run Test
+    print("Run test")
+    #RunOddball(testStimuliSequences, testPauseSequence)
+
+    print("Run continue")
+    # Show count instuctions
+    RunTrial(countText, instructionsTextInfo, _countIntructionsSound, instructionsSoundInfo, True)
+
+    print("Run train")
+    # Run Train
+    results = RunOddball(trainStimuliSequences, trainStimuliSequences, False)
+
+    print("End train")
+    print(results)
 
     # these shouldn't be strictly necessary (should auto-save)
     thisExperiment.saveAsWideText(dataFilename+'.csv', delim='auto')
