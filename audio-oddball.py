@@ -30,6 +30,7 @@ import datetime
 
 from collections import namedtuple
 from enum import Enum
+import csv
 
 import psychopy.iohub as io
 from psychopy.hardware import keyboard
@@ -51,17 +52,17 @@ ENTER_COUNT_TEXT = 'Введите количество отклоняющихс
 STANDARD_MIN_NUMBER = 3
 STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
-STIMULUS_SERIES_NUMBER = 30 #30
-CYCLES_NUMBER = 3#4
+STIMULUS_SERIES_NUMBER = 30
+CYCLES_NUMBER = 2 #4
 
 # Times
 ODD_TIME = 400
 STANDARD_TIME = 400
 STANDARD_TIME_MIN = 700
 STANDARD_TIME_MAX = 900
-PAUSE_TIME_MIN = 1000 #6000 ms
-PAUSE_TIME_MAX = 3000 #30000 ms
-CYCLE_PAUSE = 3000 #30000 ms
+PAUSE_TIME_MIN = 3000 #6000
+PAUSE_TIME_MAX = 5000 #30000 #ms
+CYCLE_PAUSE = 3000 #30000 #ms
 
 # Marks
 STANDARD_MARK = "Standard"
@@ -142,12 +143,8 @@ def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400
     random.seed(datetime.datetime.now().timestamp())
     i = 0
 
-    print("hello")
-    print(f"standardRange = {standardRange}, oddNumber = {oddNumber}, stimulusNumber = {stimulusNumber}, standardTime = {standardTime}, str = {standardTimeRange}, oddTime = {oddTime}")
-
     while i < stimulusNumber:
         # Add Standard
-        print(f'i = {i}')
         standardNumber = random.randint(standardRange.Min, standardRange.Max)
         standardTimes = [standardTime] * (standardNumber - standardRange.Min)
 
@@ -163,9 +160,6 @@ def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400
             sequence.append(StimulusInfo(StimulusType.ODD, MS_TO_S * oddTime, ODD_MARK, ODD_START_LSL, ODD_END_LSL, True))
             i += 1
 
-    for i in range(stimulusNumber):
-        print(f'({sequence[i]})')
-
     return sequence[:stimulusNumber]
 
 def CreatePauseSequence(stimulusNumber=30, timeRange=Range(700, 900)):
@@ -173,9 +167,6 @@ def CreatePauseSequence(stimulusNumber=30, timeRange=Range(700, 900)):
 
     for i in range(stimulusNumber):
         sequence.append(StimulusInfo(StimulusType.PAUSE, MS_TO_S * random.randint(timeRange.Min, timeRange.Max), 'Pause', -1, True))
-
-    for i in range(stimulusNumber):
-        print(f'({sequence[i]})')
 
     return sequence
 
@@ -314,7 +305,6 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
     # keep track of which components have finished
     components = []
     time = 0
-    print(f'texts: {texts}')
 
     if hasText:
         if type(texts) is not list:
@@ -328,7 +318,6 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
         components.append(sound)
         time = soundStimulusInfo.Duration
 
-    print(f'hasSound = {hasSound}, hasText = {hasText}, time = {time}, texts={texts}')
     for thisComponent in components:
         thisComponent.tStart = None
         thisComponent.tStop = None
@@ -532,6 +521,7 @@ def RunOddball(stimuli, pauses, test=True):
 
     results = []
     oddCount = 0
+    type = "TEST" if test else "RUN"
 
     for i in range(CYCLES_NUMBER):
         oddCount = 0
@@ -539,6 +529,7 @@ def RunOddball(stimuli, pauses, test=True):
         # Cycle
         for j in range(STIMULUS_SERIES_NUMBER):
             stimulusInfo = stimuli[i][j]
+            print(f'{type}, Cycle #{i}, Trial #{j}, Type = {stimulusInfo.Type}, D1 = {stimulusInfo.Duration}, Pause Duration = {pauses[i][j].Duration}')
             if stimulusInfo.Type == StimulusType.STANDARD:
                 sound = _standardSound
             else:
@@ -556,6 +547,12 @@ def RunOddball(stimuli, pauses, test=True):
         RunTrial(_fixation, _cyclePauseInfo, None, None)
     
     return results
+
+def PrintResultsToCsv(results, filename):
+    file = open(filename+ '.csv','w')
+    writer = csv.writer(file, delimiter=';')
+    writer.writerows([c[0], ','.join(c[1:])] for c in results)
+    file.close()
 
 # Main Scenario
 if __name__ == "__main__": 
@@ -600,24 +597,23 @@ if __name__ == "__main__":
     InitialzeStimuli(window)
     InitializeSounds()
 
-    print("Run start")
     # Show start instuctions
     RunTrial(startText, instructionsTextInfo, _startInstructionsSound, _instructionsSoundInfo, True)
 
     # Run Test
-    print("Run test")
-    #RunOddball(testStimuliSequences, testPauseSequence)
+    RunOddball(testStimuliSequences, testPauseSequence)
 
-    print("Run continue")
     # Show count instuctions
     RunTrial(countText, instructionsTextInfo, _countIntructionsSound, _instructionsSoundInfo, True)
 
-    print("Run train")
     # Run Train
-    results = RunOddball(trainStimuliSequences, trainStimuliSequences, False)
+    results = RunOddball(trainStimuliSequences, trainPauseSequence, False)
+    results.insert(0, ("odd_count", "user_input"))
 
-    print("End train")
     print(results)
+
+    resultsFilename = _thisDirectory + os.sep + u'data/results_%s_%s_%s' % (experimentInfo['Participant'], experimentName, experimentInfo['date'])
+    PrintResultsToCsv(results, resultsFilename)
 
     # these shouldn't be strictly necessary (should auto-save)
     thisExperiment.saveAsWideText(dataFilename+'.csv', delim='auto')
