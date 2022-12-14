@@ -49,7 +49,15 @@ STANDARD_MIN_NUMBER = 3
 STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
 CYCLES_NUMBER = 3
-STIMULUS_SERIES_NUMBER = 30
+STIMULUS_SERIES_NUMBER = 10 #30
+
+# Times
+ODD_TIME = 400
+STANDARD_TIME = 400
+STANDARD_TIME_MIN = 700
+STANDARD_TIME_MAX = 900
+PAUSE_TIME_MIN = 1000 #6000 ms
+PAUSE_TIME_MAX = 3000 #30000 ms
 
 # Marks
 STANDARD_MARK = "Standard"
@@ -70,17 +78,27 @@ MARK_SIZE = 20
 # Use default
 WINDOW = None
 
+MS_TO_S = 0.001
+
+# Globals
 _thisDirectory = ''
-
-
+_globalClock = None
+_defaultKeyboard = None
+_routineTimer = None
+_ioSession = None
+_ioServer = None
+_eyetracker = None
+_ioConfig = None
  
 class StimulusType(Enum):
     STANDARD = 0
     ODD = 1
+    NONE = 2,
+    PAUSE = 3
 
 # Declaring namedtuple()
 Range = namedtuple('Range', ['Min', 'Max'])
-StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration', 'Name', 'LSL', 'WriteLog'])
+StimulusInfo = namedtuple('StimulusInfo', ['Type', 'Duration', 'Name', 'LSL', 'WriteLog'], defaults=(None,) * 5)
 
 #========================================================
 # Low Level Functions
@@ -118,11 +136,11 @@ def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400
         random.shuffle(standardTimes)
 
         for j in range(standardNumber):
-            sequence.append(StimulusInfo(StimulusType.STANDARD, standardTimes[j], STANDARD_MARK, STANDARD_LSL, True))
+            sequence.append(StimulusInfo(StimulusType.STANDARD, MS_TO_S * standardTimes[j], STANDARD_MARK, STANDARD_LSL, True))
             i += 1
         
         for j in range(oddNumber):
-            sequence.append(StimulusInfo(StimulusType.ODD, oddTime, ODD_MARK, ODD_LSL, True))
+            sequence.append(StimulusInfo(StimulusType.ODD, MS_TO_S * oddTime, ODD_MARK, ODD_LSL, True))
             i += 1
 
     for i in range(stimulusNumber):
@@ -130,6 +148,16 @@ def CreateSequence(standardRange, oddNumber, stimulusNumber=30, standardTime=400
 
     return sequence[:stimulusNumber]
 
+def CreatePauseSequence(stimulusNumber=30, timeRange=Range(700, 900)):
+    sequence = []
+
+    for i in range(stimulusNumber):
+        sequence.append(StimulusInfo(StimulusType.PAUSE, MS_TO_S * random.randint(timeRange.Min, timeRange.Max), 'Pause', -1, True))
+
+    for i in range(stimulusNumber):
+        print(f'({sequence[i]})')
+        
+    return sequence
 
 def GetThisDirectory():
     global _thisDirectory
@@ -207,18 +235,23 @@ def CreatePhotosensor(window, size=15):
     
     return photosensor
 
-def RunCustomTrial(text, sound, time=0.4):
+def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo):
+    global _routineTimer
+
     continueRoutine = True
     routineForceEnded = False
-    hasText = text != None
-    hasSound = sound != None
+    hasText = text != None and textStimulusInfo != None
+    hasSound = sound != None and soundStimulusInfo != None
 
     # keep track of which components have finished
     components = []
+    time = 0
     if hasText:
         components.append(text)
+        time = textStimulusInfo.Duration
     if hasSound:
         components.append(sound)
+        time = soundStimulusInfo.Duration
 
     for thisComponent in components:
         thisComponent.tStart = None
@@ -233,10 +266,10 @@ def RunCustomTrial(text, sound, time=0.4):
     frameN = -1
     
     # --- Run Routine ---
-    while continueRoutine and routineTimer.getTime() < time:
+    while continueRoutine and _routineTimer.getTime() < time:
         # get current time
-        t = routineTimer.getTime()
-        tThisFlip = window.getFutureFlipTime(clock=routineTimer)
+        t = _routineTimer.getTime()
+        tThisFlip = window.getFutureFlipTime(clock=_routineTimer)
         tThisFlipGlobal = window.getFutureFlipTime(clock=None)
         frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
         # update/draw components on each frame
@@ -250,7 +283,8 @@ def RunCustomTrial(text, sound, time=0.4):
                 text.tStartRefresh = tThisFlipGlobal  # on global time
                 window.timeOnFlip(text, 'tStartRefresh')  # time at next scr refresh
                 # add timestamp to datafile
-                thisExperiment.timestampOnFlip(window, 'text.started')
+                if textStimulusInfo.WriteLog:
+                    thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.started')
                 text.setAutoDraw(True)
             if text.status == STARTED:
                 # is it time to stop? (based on global clock, using actual start)
@@ -259,7 +293,8 @@ def RunCustomTrial(text, sound, time=0.4):
                     text.tStop = t  # not accounting for scr refresh
                     text.frameNStop = frameN  # exact frame index
                     # add timestamp to datafile
-                    thisExperiment.timestampOnFlip(window, 'text.stopped')
+                    if textStimulusInfo.WriteLog:
+                        thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.stopped')
                     text.setAutoDraw(False)
         
         if hasSound:
@@ -270,7 +305,8 @@ def RunCustomTrial(text, sound, time=0.4):
                 sound.tStart = t  # local t and not account for scr refresh
                 sound.tStartRefresh = tThisFlipGlobal  # on global time
                 # add timestamp to datafile
-                thisExperiment.addData('sound.started', tThisFlipGlobal)
+                if soundStimulusInfo.WriteLog:
+                    thisExperiment.addData(soundStimulusInfo.Name +'.started', tThisFlipGlobal)
                 sound.play(when=window)  # sync with win flip
             if sound.status == STARTED:
                 # is it time to stop? (based on global clock, using actual start)
@@ -279,11 +315,12 @@ def RunCustomTrial(text, sound, time=0.4):
                     sound.tStop = t  # not accounting for scr refresh
                     sound.frameNStop = frameN  # exact frame index
                     # add timestamp to datafile
-                    thisExperiment.timestampOnFlip(window, 'sound.stopped')
+                    if soundStimulusInfo.WriteLog:
+                        thisExperiment.timestampOnFlip(window, soundStimulusInfo.Name +'.stopped')
                     sound.stop()
         
             # check for quit (typically the Esc key)
-        if defaultKeyboard.getKeys(keyList=["escape"]):
+        if _defaultKeyboard.getKeys(keyList=["escape"]):
             core.quit()
         
         # check if all components have finished
@@ -309,12 +346,13 @@ def RunCustomTrial(text, sound, time=0.4):
 
     # using non-slip timing so subtract the expected duration of this Routine (unless ended on request)
     if routineForceEnded:
-        routineTimer.reset()
+        _routineTimer.reset()
     else:
-        routineTimer.addTime(-time)
+        _routineTimer.addTime(-time)
     
 
 def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10000):
+    global _defaultKeyboard
     endExperimentNow = False  # flag for 'escape' or other condition => quit the exp
     continueRoutine = True
     routineForceEnded = False
@@ -386,7 +424,7 @@ def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10
                     visual.setAutoDraw(False)
                 # check for quit (typically the Esc key)
                 
-        if endExperimentNow or defaultKeyboard.getKeys(keyList=["escape"]):
+        if endExperimentNow or _defaultKeyboard.getKeys(keyList=["escape"]):
             core.quit()
     
         # check if all components have finished
@@ -411,13 +449,57 @@ def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10
     # the Routine "trial2" was not non-slip safe, so reset the non-slip timer
     routineTimer.reset()
    
+def GetSound(localPath, name):
+    fullPath = thisDirectory + localPath#'\\Start.wav''startInstructionsSound'
+    soundStimulus = sound.Sound(fullPath, secs=-1, stereo=True, hamming=True, name=name)
+    soundStimulus.setVolume(1.0)
+    soundStimulus.setSound(fullPath, secs=-1, hamming=False)
+    soundStimulus.setVolume(1.0, log=False)
+
+    return soundStimulus
+
+def StoreCurrentExperimentInfo(experimentInfo):
+    global _ioConfig
+    global _ioServer
+    global _ioSession
+    global _routineTimer
+    global _defaultKeyboard
+
+   # store frame rate of monitor if we can measure it
+    experimentInfo['frameRate'] = window.getActualFrameRate()
+    if experimentInfo['frameRate'] != None:
+        frameDur = 1.0 / round(experimentInfo['frameRate'])
+    else:
+        frameDur = 1.0 / 60.0  # could not measure, so guess
+    # --- Setup input devices ---
+    _ioConfig = {}
+
+    # Setup iohub keyboard
+    _ioConfig['Keyboard'] = dict(use_keymap='psychopy')
+
+    _ioSession = '1'
+    if 'session' in experimentInfo:
+        _ioSession = str(experimentInfo['session'])
+    _ioServer = io.launchHubServer(window=window, **_ioConfig)
+    _eyetracker = None
+
+    # create a default keyboard (e.g. to check for escape)
+    _defaultKeyboard = keyboard.Keyboard(backend='iohub')
+
+    # --- Initialize components for Routine "trial" ---
+
+    # Create some handy timers
+    _globalClock = core.Clock()  # to track the time since experiment started
+    _routineTimer = core.Clock()  # to track time remaining of each (possibly non-slip) routine 
+    
+
 # Main Scenario
 if __name__ == "__main__": 
     thisDirectory = GetThisDirectory()
     print(thisDirectory)
     
-    CreateSequence(Range(STANDARD_MIN_NUMBER, STANDARD_MAX_NUMBER), ODD_NUMBER, STIMULUS_SERIES_NUMBER)
-    print("hiiii!")
+    stimuliInfo = CreateSequence(Range(STANDARD_MIN_NUMBER, STANDARD_MAX_NUMBER), ODD_NUMBER, STIMULUS_SERIES_NUMBER)
+    pauseInfo = CreatePauseSequence(STIMULUS_SERIES_NUMBER, Range(PAUSE_TIME_MIN, PAUSE_TIME_MAX))
 
     experimentName = EXPERIMENT_NAME
     psychopyVersion = '2022.2.4'
@@ -449,67 +531,35 @@ if __name__ == "__main__":
     fixation = CreateFixationStimulus(window)
     startText = CreateTextStimulus(window, START_TEXT)
     
-
-    size = MARK_SIZE
-    bg_color = [1, 1, 1]
     photosensor = CreatePhotosensor(window)
     
-    startInstructionFile = thisDirectory + '\\Start.wav'
-    startInstructionsSound = sound.Sound(startInstructionFile, secs=-1, stereo=True, hamming=True, name='startInstructionsSound')
-    startInstructionsSound.setVolume(1.0)
-    startInstructionsSound.setSound(startInstructionFile, secs=-1, hamming=False)
-    startInstructionsSound.setVolume(1.0, log=False)
+    startInstructionsSound = GetSound('\\Start.wav', 'startInstructionsSound')
+    oddSound = GetSound('\\pink-noise.wav', ODD_MARK)
+    standardSound = GetSound('\\white-noise.wav', STANDARD_MARK)
 
-    oddAudioFile = thisDirectory + '\\pink-noise.wav'
-    standartAudioFile = thisDirectory + '\\white-noise.wav'
-
-    standardSound = sound.Sound(standartAudioFile, secs=8, stereo=True, hamming=True,
-        name='standardSound')
-    standardSound.setVolume(8.0)
-    standardSound.setSound(standartAudioFile, secs=-1, hamming=False)
-    standardSound.setVolume(8.0, log=False)
-
-    # store frame rate of monitor if we can measure it
-    experimentInfo['frameRate'] = window.getActualFrameRate()
-    if experimentInfo['frameRate'] != None:
-        frameDur = 1.0 / round(experimentInfo['frameRate'])
-    else:
-        frameDur = 1.0 / 60.0  # could not measure, so guess
-    # --- Setup input devices ---
-    ioConfig = {}
-
-    # Setup iohub keyboard
-    ioConfig['Keyboard'] = dict(use_keymap='psychopy')
-
-    ioSession = '1'
-    if 'session' in experimentInfo:
-        ioSession = str(experimentInfo['session'])
-    ioServer = io.launchHubServer(window=window, **ioConfig)
-    eyetracker = None
-
-    # create a default keyboard (e.g. to check for escape)
-    defaultKeyboard = keyboard.Keyboard(backend='iohub')
-
-    # --- Initialize components for Routine "trial" ---
-
-    # Create some handy timers
-    globalClock = core.Clock()  # to track the time since experiment started
-    routineTimer = core.Clock()  # to track time remaining of each (possibly non-slip) routine 
-    
     startSoundInfo = (startInstructionsSound, True, 'startInstruction')
     visualsInfo = [(startText, False, '')]
-    RunTrial(window, thisExperiment, startSoundInfo, visualsInfo, routineTimer)
+ 
+    StoreCurrentExperimentInfo(experimentInfo)
+
+    RunTrial(window, thisExperiment, startSoundInfo, visualsInfo, _routineTimer)
     
     standardSoundInfo = (standardSound, True, 'startInstruction')
     visualsInfo = [(fixation, False, '')]
-    RunTrial(window, thisExperiment, standardSoundInfo, visualsInfo, routineTimer, 8)
+    RunTrial(window, thisExperiment, standardSoundInfo, visualsInfo, _routineTimer, 8)
     # update component parameters for each repeat
     standardSound.setSound('C:/Users/yulia.sazonova/Desktop/oddball/oddball_task/pink-noise.wav', secs=0.4, hamming=True)
     standardSound.setVolume(1.0, log=False)
-    RunCustomTrial(fixation, standardSound)
-    RunCustomTrial(fixation, None, 10)
-    RunCustomTrial(fixation, standardSound)
-    RunCustomTrial(fixation, None, 10)
+
+    fixationInfo = StimulusInfo(
+        Type = StimulusType.NONE, 
+        Duration = -1,
+        WriteLog = False)
+
+    for i in range(STIMULUS_SERIES_NUMBER):
+        RunCustomTrial(fixation, fixationInfo, standardSound, stimuliInfo[i])
+        RunCustomTrial(fixation, pauseInfo[i], None, None)
+
     '''
     # --- Prepare to start Routine "trial" ---
     continueRoutine = True
@@ -581,8 +631,8 @@ if __name__ == "__main__":
     thisExperiment.saveAsPickle(dataFilename)
     logging.flush()
     # make sure everything is closed down
-    if eyetracker:
-        eyetracker.setConnectionState(False)
+    if _eyetracker:
+        _eyetracker.setConnectionState(False)
     thisExperiment.abort()  # or data files will save again on exit
     window.close()
     core.quit()
