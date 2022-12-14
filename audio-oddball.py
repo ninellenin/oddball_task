@@ -45,14 +45,14 @@ START_TEXT = 'Здравствуйте!\n\
 COUNT_TEXT = 'Теперь вам нужно посчитать количество отклоняющихся сигналов\n\
 Продолжайте выполнять задание клавиатурного тренажёра.\n\
 Нажмите "Enter", чтобы начать'
-ENTER_COUNT_TEXT = 'Введите количество отклоняющихся сигналов'
+ENTER_COUNT_TEXT = 'Введите количество отклоняющихся сигналов:'
 
 # Number of standard
 STANDARD_MIN_NUMBER = 3
 STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
-STIMULUS_SERIES_NUMBER = 10 #30
-CYCLES_NUMBER = 2#4
+STIMULUS_SERIES_NUMBER = 30 #30
+CYCLES_NUMBER = 3#4
 
 # Times
 ODD_TIME = 400
@@ -105,7 +105,10 @@ _enterCountIntrustions = None
 
 _fixation = None
 _fixationInfo = None
+_instructionsSoundInfo = None
 _cyclePauseInfo = None
+_resultTextBox = None
+_resultText = None
  
 class StimulusType(Enum):
     STANDARD = 0
@@ -225,7 +228,7 @@ def ShowCountDialog():
         text: ""
     }
 
-    dialog = gui.DlgFromDict(dictionary=dictionary, sortKeys=False, title=ENTER_COUNT_TEXT)
+    dialog = gui.DlgFromDict(dictionary=dictionary, sortKeys=False, title=ENTER_COUNT_TEXT, screen=-1)
 
     return dictionary[text]
 
@@ -255,6 +258,35 @@ def CreateTextStimulus(window, text):
 
 def CreateFixationStimulus(window):    
     return CreateTextStimulus(window, '+')
+
+def CreateInputTextbox(window):
+    textbox = visual.TextBox2(
+        window, 
+        text='',
+        font='Open Sans',
+        pos=(0, 0),
+        letterHeight=0.05,
+        size=(None, None),
+        borderWidth=2.0,
+        color='white',
+        colorSpace='rgb',
+        opacity=None,
+        bold=False,
+        italic=False,
+        lineSpacing=1.0,
+        padding=0.0, 
+        alignment='center', 
+        anchor='center',
+        fillColor=None,
+        borderColor=None,
+        flipHoriz=False, 
+        flipVert=False, 
+        languageStyle='LTR',
+        editable=True,
+        name='textbox',
+        autoLog=True)
+    
+    return textbox
     
 def CreatePhotosensor(window, size=15):
     photosensor = visual.Rect(
@@ -271,25 +303,32 @@ def CreatePhotosensor(window, size=15):
     
     return photosensor
 
-def RunTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInput=False):
+def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=False):
     global _routineTimer
 
     continueRoutine = True
     routineForceEnded = False
-    hasText = text != None and textStimulusInfo != None
+    hasText = texts != None and textStimulusInfo != None
     hasSound = sound != None and soundStimulusInfo != None
 
     # keep track of which components have finished
     components = []
     time = 0
+    print(f'texts: {texts}')
+
     if hasText:
-        components.append(text)
+        if type(texts) is not list:
+            texts = [texts]
+
         time = textStimulusInfo.Duration
+        
+        for text in texts:
+            components.append(text)
     if hasSound:
         components.append(sound)
         time = soundStimulusInfo.Duration
 
-    print(f'hasSound = {hasSound}, hasText = {hasText}, time = {time}')
+    print(f'hasSound = {hasSound}, hasText = {hasText}, time = {time}, texts={texts}')
     for thisComponent in components:
         thisComponent.tStart = None
         thisComponent.tStop = None
@@ -313,26 +352,27 @@ def RunTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fals
         
         # *text* updates
         if hasText:
-            if text.status == NOT_STARTED and tThisFlip >= 0.0 - frameTolerance:
-                # keep track of start time/frame for later
-                text.frameNStart = frameN  # exact frame index
-                text.tStart = t  # local t and not account for scr refresh
-                text.tStartRefresh = tThisFlipGlobal  # on global time
-                window.timeOnFlip(text, 'tStartRefresh')  # time at next scr refresh
-                # add timestamp to datafile
-                if textStimulusInfo.WriteLog:
-                    thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.started')
-                text.setAutoDraw(True)
-            if text.status == STARTED:
-                # is it time to stop? (based on global clock, using actual start)
-                if tThisFlipGlobal > text.tStartRefresh + time - frameTolerance:
-                    # keep track of stop time/frame for later
-                    text.tStop = t  # not accounting for scr refresh
-                    text.frameNStop = frameN  # exact frame index
+            for text in texts:
+                if text.status == NOT_STARTED and tThisFlip >= 0.0 - frameTolerance:
+                    # keep track of start time/frame for later
+                    text.frameNStart = frameN  # exact frame index
+                    text.tStart = t  # local t and not account for scr refresh
+                    text.tStartRefresh = tThisFlipGlobal  # on global time
+                    window.timeOnFlip(text, 'tStartRefresh')  # time at next scr refresh
                     # add timestamp to datafile
                     if textStimulusInfo.WriteLog:
-                        thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.stopped')
-                    text.setAutoDraw(False)
+                        thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.started')
+                    text.setAutoDraw(True)
+                if text.status == STARTED:
+                    # is it time to stop? (based on global clock, using actual start)
+                    if tThisFlipGlobal > text.tStartRefresh + time - frameTolerance:
+                        # keep track of stop time/frame for later
+                        text.tStop = t  # not accounting for scr refresh
+                        text.frameNStop = frameN  # exact frame index
+                        # add timestamp to datafile
+                        if textStimulusInfo.WriteLog:
+                            thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.stopped')
+                        text.setAutoDraw(False)
         
         if hasSound:
             # start/stop sound
@@ -460,10 +500,13 @@ def GetSequences(cyclesNumber):
 
     return stimuliSequence, pauseSequence
 
-def InitialzeStimulus(window):
+def InitialzeStimuli(window):
     global _fixation
     global _fixationInfo
     global _cyclePauseInfo
+    global _resultTextBox
+    global _resultText
+    global _instructionsSoundInfo
 
     _fixation = CreateFixationStimulus(window)
     _fixationInfo = StimulusInfo(
@@ -471,13 +514,22 @@ def InitialzeStimulus(window):
         Duration = -1,
         WriteLog = False)
     _fixation = CreateFixationStimulus(window)
+    _instructionsSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=True, Name='startInstruction', Duration=1000000)
     _cyclePauseInfo = StimulusInfo(
         Type = StimulusType.NONE, 
         Duration = MS_TO_S * CYCLE_PAUSE,
         Name = "Cycle pause",
         WriteLog = True)
+    _resultTextBox = CreateInputTextbox(window)
+    _resultText = CreateTextStimulus(window, ENTER_COUNT_TEXT)
+    _resultText.pos = (0, 0.2)
 
 def RunOddball(stimuli, pauses, test=True):
+    global _resultTextBox
+    global _resultText
+    global _fixationInfo
+    global _instructionsSoundInfo
+
     results = []
     oddCount = 0
 
@@ -497,7 +549,9 @@ def RunOddball(stimuli, pauses, test=True):
 
         # Pause between cycles
         if not test:
-            results.append((oddCount, ShowCountDialog()))
+            RunTrial([_resultTextBox, _resultText], _fixationInfo, _enterCountIntrustions, _instructionsSoundInfo, True)
+            results.append((oddCount, _resultTextBox.text.strip()))
+            _resultTextBox.text = ''
         
         RunTrial(_fixation, _cyclePauseInfo, None, None)
     
@@ -542,14 +596,13 @@ if __name__ == "__main__":
     startText = CreateTextStimulus(window, START_TEXT)
     countText = CreateTextStimulus(window, COUNT_TEXT)
     instructionsTextInfo = StimulusInfo(StimulusType.NONE, WriteLog=False)
-    instructionsSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=True, Name='startInstruction', Duration=1000000)
     photosensor = CreatePhotosensor(window)
-    InitialzeStimulus(window)
+    InitialzeStimuli(window)
     InitializeSounds()
 
     print("Run start")
     # Show start instuctions
-    RunTrial(startText, instructionsTextInfo, _startInstructionsSound, instructionsSoundInfo, True)
+    RunTrial(startText, instructionsTextInfo, _startInstructionsSound, _instructionsSoundInfo, True)
 
     # Run Test
     print("Run test")
@@ -557,7 +610,7 @@ if __name__ == "__main__":
 
     print("Run continue")
     # Show count instuctions
-    RunTrial(countText, instructionsTextInfo, _countIntructionsSound, instructionsSoundInfo, True)
+    RunTrial(countText, instructionsTextInfo, _countIntructionsSound, _instructionsSoundInfo, True)
 
     print("Run train")
     # Run Train
