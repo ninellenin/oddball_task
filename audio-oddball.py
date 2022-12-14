@@ -39,10 +39,9 @@ WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 768
 SCREEN_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
 EXPERIMENT_NAME = 'audio-oddball'
-START_TEXT = 'Здравствуйте!\
-\
+START_TEXT = 'Здравствуйте!\n\
 Выполняйте задание клавиатурного тренажёра.\
-Не обращайте внимания на сигналы'
+Не обращайте внимания на сигналы. Нажмите "Enter", чтобы начать'
 
 # Number of standard
 STANDARD_MIN_NUMBER = 3
@@ -89,6 +88,10 @@ _ioSession = None
 _ioServer = None
 _eyetracker = None
 _ioConfig = None
+
+_startInstructionSound = None
+_oddSound = None
+_standardSound = None
  
 class StimulusType(Enum):
     STANDARD = 0
@@ -156,7 +159,7 @@ def CreatePauseSequence(stimulusNumber=30, timeRange=Range(700, 900)):
 
     for i in range(stimulusNumber):
         print(f'({sequence[i]})')
-        
+
     return sequence
 
 def GetThisDirectory():
@@ -235,7 +238,7 @@ def CreatePhotosensor(window, size=15):
     
     return photosensor
 
-def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo):
+def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo, waitForInput=False):
     global _routineTimer
 
     continueRoutine = True
@@ -253,6 +256,7 @@ def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo):
         components.append(sound)
         time = soundStimulusInfo.Duration
 
+    print(f'hasSound = {hasSound}, hasText = {hasText}, time = {time}')
     for thisComponent in components:
         thisComponent.tStart = None
         thisComponent.tStop = None
@@ -319,9 +323,12 @@ def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo):
                         thisExperiment.timestampOnFlip(window, soundStimulusInfo.Name +'.stopped')
                     sound.stop()
         
-            # check for quit (typically the Esc key)
-        if _defaultKeyboard.getKeys(keyList=["escape"]):
+        # check for quit (typically the Esc key)
+        keys = _defaultKeyboard.getKeys(keyList=["escape", "return"])
+        if "escape" in keys:
             core.quit()
+        if waitForInput and "return" in keys:
+            time = 0
         
         # check if all components have finished
         if not continueRoutine:  # a component has requested a forced-end of Routine
@@ -349,105 +356,6 @@ def RunCustomTrial(text, textStimulusInfo, sound, soundStimulusInfo):
         _routineTimer.reset()
     else:
         _routineTimer.addTime(-time)
-    
-
-def RunTrial(window, thisExperiment, soundInfo, visuals, routineTimer, time = 10000):
-    global _defaultKeyboard
-    endExperimentNow = False  # flag for 'escape' or other condition => quit the exp
-    continueRoutine = True
-    routineForceEnded = False
-
-    sound = soundInfo[0]
-    # update component parameters for each repeat
-    #sound_2.setSound('C:/Users/yulia.sazonova/Desktop/oddball/oddball_task/white-noise44.wav', hamming=True)
-    #sound_2.setVolume(1.0, log=False)
-    # keep track of which components have finished
-    trialComponents = [sound]
-    
-    for visual in visuals:
-        trialComponents.append(visual[0])
-    
-    for thisComponent in trialComponents:
-        thisComponent.tStart = None
-        thisComponent.tStop = None
-        thisComponent.tStartRefresh = None
-        thisComponent.tStopRefresh = None
-        if hasattr(thisComponent, 'status'):
-            thisComponent.status = NOT_STARTED
-    # reset timers
-    t = 0
-    _timeToFirstFrame = window.getFutureFlipTime(clock="now")
-    frameN = -1
-
-    # --- Run Routine "trial2" ---
-    while continueRoutine and routineTimer.getTime() < time:
-        # get current time
-        t = routineTimer.getTime()
-        tThisFlip = window.getFutureFlipTime(clock=routineTimer)
-        tThisFlipGlobal = window.getFutureFlipTime(clock=None)
-        frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
-        # update/draw components on each frame
-        # start/stop sound
-        if sound.status == NOT_STARTED and tThisFlip >= 0.0-frameTolerance:
-            # keep track of start time/frame for later
-            sound.frameNStart = frameN  # exact frame index
-            sound.tStart = t  # local t and not account for scr refresh
-            sound.tStartRefresh = tThisFlipGlobal  # on global time
-            # add timestamp to datafile
-            if soundInfo[1]:
-                thisExperiment.addData(soundInfo[2] + '.started', tThisFlipGlobal)
-            sound.play(when=window)  # sync with win flip
-            
-        # *visuals* updates
-        for visualInfo in visuals:
-            visual = visualInfo[0]
-            if visual.status == NOT_STARTED and tThisFlip >= 0.0-frameTolerance:
-                # keep track of start time/frame for later
-                visual.frameNStart = frameN  # exact frame index
-                visual.tStart = t  # local t and not account for scr refresh
-                visual.tStartRefresh = tThisFlipGlobal  # on global time
-                window.timeOnFlip(visual, 'tStartRefresh')  # time at next scr refresh
-                # add timestamp to datafile
-                if (visualInfo[1]):
-                    thisExperiment.timestampOnFlip(window, visualInfo[2] + '.started')
-            visual.setAutoDraw(True)
-            
-            if visual.status == STARTED:
-                # is it time to stop? (based on global clock, using actual start)
-                if tThisFlipGlobal > visual.tStartRefresh + 1.0-frameTolerance:
-                    # keep track of stop time/frame for later
-                    visual.tStop = t  # not accounting for scr refresh
-                    visual.frameNStop = frameN  # exact frame index
-                    # add timestamp to datafile
-                    if (visualInfo[1]):
-                        thisExperiment.timestampOnFlip(window, visualInfo[2] + '.stopped')
-                    visual.setAutoDraw(False)
-                # check for quit (typically the Esc key)
-                
-        if endExperimentNow or _defaultKeyboard.getKeys(keyList=["escape"]):
-            core.quit()
-    
-        # check if all components have finished
-        if not continueRoutine:  # a component has requested a forced-end of Routine
-            routineForceEnded = True
-            break
-        continueRoutine = False  # will revert to True if at least one component still running
-        for thisComponent in trialComponents:
-            if hasattr(thisComponent, "status") and thisComponent.status != FINISHED:
-                continueRoutine = True
-                break  # at least one component has not yet finished
-    
-        # refresh the screen
-        if continueRoutine:  # don't flip if this routine is over or we'll get a blank screen
-            window.flip()
-
-    # --- Ending Routine "trial2" ---
-    for thisComponent in trialComponents:
-        if hasattr(thisComponent, "setAutoDraw"):
-            thisComponent.setAutoDraw(False)
-    sound.stop()  # ensure sound has stopped at end of routine
-    # the Routine "trial2" was not non-slip safe, so reset the non-slip timer
-    routineTimer.reset()
    
 def GetSound(localPath, name):
     fullPath = thisDirectory + localPath#'\\Start.wav''startInstructionsSound'
@@ -457,6 +365,15 @@ def GetSound(localPath, name):
     soundStimulus.setVolume(1.0, log=False)
 
     return soundStimulus
+
+def InitializeSounds():
+    global _startInstructionsSound
+    global _oddSound 
+    global _standardSound
+
+    _startInstructionsSound = GetSound('\\Start.wav', 'startInstructionsSound')
+    _oddSound = GetSound('\\pink-noise.wav', ODD_MARK)
+    _standardSound = GetSound('\\white-noise.wav', STANDARD_MARK)
 
 def StoreCurrentExperimentInfo(experimentInfo):
     global _ioConfig
@@ -509,7 +426,6 @@ if __name__ == "__main__":
 
     # An ExperimentHandler isn't essential but helps with data saving
     thisExperiment = GetExperimentHandler(experimentInfo, experimentName, dataFilename)
-
     frameTolerance = 0.001  # how close to onset before 'same' frame
 
     # Start Code - component code to be run after the window creation
@@ -530,26 +446,12 @@ if __name__ == "__main__":
     
     fixation = CreateFixationStimulus(window)
     startText = CreateTextStimulus(window, START_TEXT)
-    
+    startInstructionsSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=True, Name='startInstruction', Duration=1000000)
     photosensor = CreatePhotosensor(window)
     
-    startInstructionsSound = GetSound('\\Start.wav', 'startInstructionsSound')
-    oddSound = GetSound('\\pink-noise.wav', ODD_MARK)
-    standardSound = GetSound('\\white-noise.wav', STANDARD_MARK)
-
-    startSoundInfo = (startInstructionsSound, True, 'startInstruction')
-    visualsInfo = [(startText, False, '')]
- 
+    InitializeSounds()
     StoreCurrentExperimentInfo(experimentInfo)
-
-    RunTrial(window, thisExperiment, startSoundInfo, visualsInfo, _routineTimer)
-    
-    standardSoundInfo = (standardSound, True, 'startInstruction')
-    visualsInfo = [(fixation, False, '')]
-    RunTrial(window, thisExperiment, standardSoundInfo, visualsInfo, _routineTimer, 8)
-    # update component parameters for each repeat
-    standardSound.setSound('C:/Users/yulia.sazonova/Desktop/oddball/oddball_task/pink-noise.wav', secs=0.4, hamming=True)
-    standardSound.setVolume(1.0, log=False)
+    RunCustomTrial(startText, StimulusInfo(StimulusType.NONE, WriteLog=False), _startInstructionsSound, startInstructionsSoundInfo, True)
 
     fixationInfo = StimulusInfo(
         Type = StimulusType.NONE, 
@@ -557,75 +459,11 @@ if __name__ == "__main__":
         WriteLog = False)
 
     for i in range(STIMULUS_SERIES_NUMBER):
-        RunCustomTrial(fixation, fixationInfo, standardSound, stimuliInfo[i])
+        stimulusInfo = stimuliInfo[i]
+        sound = _standardSound if stimulusInfo.Type == StimulusType.STANDARD else _oddSound
+        RunCustomTrial(fixation, fixationInfo, sound, stimuliInfo[i])
         RunCustomTrial(fixation, pauseInfo[i], None, None)
 
-    '''
-    # --- Prepare to start Routine "trial" ---
-    continueRoutine = True
-    routineForceEnded = False
-    # update component parameters for each repeat
-    # keep track of which components have finished
-    trialComponents = []
-    for thisComponent in trialComponents:
-        thisComponent.tStart = None
-        thisComponent.tStop = None
-        thisComponent.tStartRefresh = None
-        thisComponent.tStopRefresh = None
-        if hasattr(thisComponent, 'status'):
-            thisComponent.status = NOT_STARTED
-    # reset timers
-    t = 0
-    _timeToFirstFrame = window.getFutureFlipTime(clock="now")
-    frameN = -1
-    # --- Run Routine "trial" ---
-    while continueRoutine:
-        # get current time
-        t = routineTimer.getTime()
-        tThisFlip = window.getFutureFlipTime(clock=routineTimer)
-        tThisFlipGlobal = window.getFutureFlipTime(clock=None)
-                
-        frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
-        # update/draw components on each frame
-            
-        # check for quit (typically the Esc key)
-        keys = defaultKeyboard.getKeys(keyList=["escape"])
-        if keys:
-            core.quit()
-        
-        # check if all components have finished
-        if not continueRoutine:  # a component has requested a forced-end of Routine
-            routineForceEnded = True
-            break
-        #continueRoutine = False  # will revert to True if at least one component still running
-        
-        for thisComponent in trialComponents:
-            if hasattr(thisComponent, "status") and thisComponent.status != FINISHED:
-                continueRoutine = True
-                break  # at least one component has not yet finished
-        
-        continueRoutine = True
-        # refresh the screen
-        if continueRoutine:  # don't flip if this routine is over or we'll get a blank screen
-            stim.draw()
-            photosensor.draw()
-            window.flip()
-            standardSound.play()
-            #standardSound.stop()
-
-    # --- Ending Routine "trial" ---
-    for thisComponent in trialComponents:
-        if hasattr(thisComponent, "setAutoDraw"):
-            thisComponent.setAutoDraw(False)
-    # the Routine "trial" was not non-slip safe, so reset the non-slip timer
-    routineTimer.reset()
-
-    # --- End experiment ---
-    # Flip one final time so any remaining win.callOnFlip() 
-    # and win.timeOnFlip() tasks get executed before quitting
-    window.flip()
-
-    '''
     # these shouldn't be strictly necessary (should auto-save)
     thisExperiment.saveAsWideText(dataFilename+'.csv', delim='auto')
     thisExperiment.saveAsPickle(dataFilename)
