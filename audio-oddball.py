@@ -61,8 +61,8 @@ EXAMPLES_PAUSE = 1000
 STANDARD_MIN_NUMBER = 3
 STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
-STIMULUS_SERIES_NUMBER = 15 #30
-CYCLES_NUMBER = 2 #4
+STIMULUS_SERIES_NUMBER = 10 #30
+CYCLES_NUMBER = 3 #4
 
 # Times
 ODD_TIME = 400
@@ -657,7 +657,12 @@ if __name__ == "__main__":
     print(thisDirectory)
     
     testStimuliSequences, testPauseSequence = GetSequences(CYCLES_NUMBER)
-    trainStimuliSequences, trainPauseSequence = GetSequences(CYCLES_NUMBER)
+
+    # genarate permutation
+    trainStimuliSequences = testStimuliSequences.copy()
+    random.shuffle(trainStimuliSequences)
+    trainPauseSequence = testPauseSequence.copy()
+    random.shuffle(trainPauseSequence)
 
     experimentName = EXPERIMENT_NAME
     psychopyVersion = '2022.2.4'
