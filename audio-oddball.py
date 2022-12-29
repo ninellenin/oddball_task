@@ -42,17 +42,26 @@ SCREEN_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
 EXPERIMENT_NAME = 'audio-oddball'
 START_TEXT = 'Здравствуйте!\n\
 Выполняйте задание клавиатурного тренажёра.\n\
-Не обращайте внимания на сигналы.\n Нажмите "Enter", чтобы начать'
+Не обращайте внимания на сигналы.\nНажмите "Enter", чтобы начать'
+STANDARD_EXAMPLE_TEXT = 'Это стандартный сигнал'
+ODD_EXAMPLE_TEXT = 'Это отклоняющийся сигнал'
+CONTINUE_TEXT = 'Нажмите "Enter", чтобы начать'
 COUNT_TEXT = 'Теперь вам нужно посчитать количество отклоняющихся сигналов\n\
 Продолжайте выполнять задание клавиатурного тренажёра.\n\
 Нажмите "Enter", чтобы начать'
 ENTER_COUNT_TEXT = 'Введите количество отклоняющихся сигналов:'
 
+# Main
+SHOW_TEST_BLOCK = True # Replace with False to turn off
+SHOW_MAIN_BLOCK = True
+NUMBER_OF_EXAMPLES = 3
+EXAMPLES_PAUSE = 1000
+
 # Number of standard
 STANDARD_MIN_NUMBER = 3
 STANDARD_MAX_NUMBER = 7
 ODD_NUMBER = 1
-STIMULUS_SERIES_NUMBER = 30
+STIMULUS_SERIES_NUMBER = 15 #30
 CYCLES_NUMBER = 2 #4
 
 # Times
@@ -60,8 +69,8 @@ ODD_TIME = 400
 STANDARD_TIME = 400
 STANDARD_TIME_MIN = 700
 STANDARD_TIME_MAX = 900
-PAUSE_TIME_MIN = 3000 #6000
-PAUSE_TIME_MAX = 5000 #30000 #ms
+PAUSE_TIME_MIN = 1000 #6000
+PAUSE_TIME_MAX = 2000 #30000 #ms
 CYCLE_PAUSE = 3000 #30000 #ms
 
 # Marks
@@ -103,19 +112,31 @@ _oddSound = None
 _standardSound = None
 _countIntructionsSound = None
 _enterCountIntrustions = None
+_oddAnnouncementIntrustions = None
+_standardAnnouncementIntrustions = None
 
 _fixation = None
 _fixationInfo = None
 _instructionsSoundInfo = None
+_examplesSoundInfo = None
+_stimulusSoundInfo = None
+_examplePauseInfo = None
 _cyclePauseInfo = None
 _resultTextBox = None
 _resultText = None
+
+_terminated = False
  
 class StimulusType(Enum):
     STANDARD = 0
     ODD = 1
     NONE = 2,
     PAUSE = 3
+
+class TrialState(Enum):
+    OK = 0,
+    TERMINATED = 1,
+    ERROR = 2
 
 # Declaring namedtuple()
 Range = namedtuple('Range', ['Min', 'Max'])
@@ -296,7 +317,10 @@ def CreatePhotosensor(window, size=15):
 
 def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=False):
     global _routineTimer
+    global _terminated
 
+    if (_terminated):
+        return TrialState.TERMINATED
     continueRoutine = True
     routineForceEnded = False
     hasText = texts != None and textStimulusInfo != None
@@ -327,15 +351,15 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
             thisComponent.status = NOT_STARTED
     # reset timers
     t = 0
-    _timeToFirstFrame = window.getFutureFlipTime(clock="now")
+    _timeToFirstFrame = _window.getFutureFlipTime(clock="now")
     frameN = -1
-    
+
     # --- Run Routine ---
-    while continueRoutine and _routineTimer.getTime() < time:
+    while continueRoutine and (time == -1 or _routineTimer.getTime() < time):
         # get current time
         t = _routineTimer.getTime()
-        tThisFlip = window.getFutureFlipTime(clock=_routineTimer)
-        tThisFlipGlobal = window.getFutureFlipTime(clock=None)
+        tThisFlip = _window.getFutureFlipTime(clock=_routineTimer)
+        tThisFlipGlobal = _window.getFutureFlipTime(clock=None)
         frameN = frameN + 1  # number of completed frames (so 0 is the first frame)
         # update/draw components on each frame
         
@@ -347,10 +371,10 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
                     text.frameNStart = frameN  # exact frame index
                     text.tStart = t  # local t and not account for scr refresh
                     text.tStartRefresh = tThisFlipGlobal  # on global time
-                    window.timeOnFlip(text, 'tStartRefresh')  # time at next scr refresh
+                    _window.timeOnFlip(text, 'tStartRefresh')  # time at next scr refresh
                     # add timestamp to datafile
                     if textStimulusInfo.WriteLog:
-                        thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.started')
+                        thisExperiment.timestampOnFlip(_window, textStimulusInfo.Name + '.started')
                     text.setAutoDraw(True)
                 if text.status == STARTED:
                     # is it time to stop? (based on global clock, using actual start)
@@ -360,7 +384,7 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
                         text.frameNStop = frameN  # exact frame index
                         # add timestamp to datafile
                         if textStimulusInfo.WriteLog:
-                            thisExperiment.timestampOnFlip(window, textStimulusInfo.Name + '.stopped')
+                            thisExperiment.timestampOnFlip(_window, textStimulusInfo.Name + '.stopped')
                         text.setAutoDraw(False)
         
         if hasSound:
@@ -375,8 +399,8 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
                     thisExperiment.addData(soundStimulusInfo.Name +'.started', tThisFlipGlobal)
                 if soundStimulusInfo.LSLStart != -1:
                     _lslOutlet.push_sample(x=[soundStimulusInfo.LSLStart])
-                sound.play(when=window)  # sync with win flip
-            if sound.status == STARTED:
+                sound.play(when=_window)  # sync with win flip
+            if sound.status == STARTED and time != -1:
                 # is it time to stop? (based on global clock, using actual start)
                 if tThisFlipGlobal > sound.tStartRefresh + time - frameTolerance:
                     # keep track of stop time/frame for later
@@ -384,7 +408,7 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
                     sound.frameNStop = frameN  # exact frame index
                     # add timestamp to datafile
                     if soundStimulusInfo.WriteLog:
-                        thisExperiment.timestampOnFlip(window, soundStimulusInfo.Name +'.stopped')
+                        thisExperiment.timestampOnFlip(_window, soundStimulusInfo.Name +'.stopped')
                     if soundStimulusInfo.LSLEnd != -1:
                         _lslOutlet.push_sample(x=[soundStimulusInfo.LSLEnd])
                     sound.stop()
@@ -392,7 +416,9 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
         # check for quit (typically the Esc key)
         keys = _defaultKeyboard.getKeys(keyList=["escape", "return"])
         if "escape" in keys:
-            core.quit()
+            _terminated = True
+            return TrialState.TERMINATED
+            #core.quit()
         if waitForInput and "return" in keys:
             time = 0
         
@@ -408,7 +434,7 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
         
         # refresh the screen
         if continueRoutine:  # don't flip if this routine is over or we'll get a blank screen
-            window.flip()
+            _window.flip()
     
     # --- Ending Routine "StandardStimulus" ---
     for thisComponent in components:
@@ -422,6 +448,8 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
         _routineTimer.reset()
     else:
         _routineTimer.addTime(-time)
+
+    return TrialState.OK
    
 def GetSound(localPath, name):
     fullPath = thisDirectory + localPath#'\\Start.wav''startInstructionsSound'
@@ -438,12 +466,16 @@ def InitializeSounds():
     global _enterCountIntrustions
     global _oddSound 
     global _standardSound
+    global _oddAnnouncementIntrustions
+    global _standardAnnouncementIntrustions
 
     _startInstructionsSound = GetSound('\\start-instructions.wav', 'startInstructionsSound')
     _countIntructionsSound = GetSound('\\continue-instructions.wav', 'continueInstructionsSound')
     _enterCountIntrustions = GetSound('\\enter-count-instructions.wav', 'enterCountInstructionsSound')
-    _oddSound = GetSound('\\pink-noise.wav', ODD_MARK)
-    _standardSound = GetSound('\\white-noise.wav', STANDARD_MARK)
+    _oddAnnouncementIntrustions = GetSound('\\odd-announcement.wav', 'oddAnnouncementSound')
+    _standardAnnouncementIntrustions = GetSound('\\standard-announcement.wav', 'standardAnnouncementSound')
+    _oddSound = GetSound('\\white-noise.wav', ODD_MARK)
+    _standardSound = GetSound('\\pink-noise.wav', STANDARD_MARK)
 
 def StoreCurrentExperimentInfo(experimentInfo):
     global _ioConfig
@@ -453,7 +485,7 @@ def StoreCurrentExperimentInfo(experimentInfo):
     global _defaultKeyboard
 
    # store frame rate of monitor if we can measure it
-    experimentInfo['frameRate'] = window.getActualFrameRate()
+    experimentInfo['frameRate'] = _window.getActualFrameRate()
     if experimentInfo['frameRate'] != None:
         frameDur = 1.0 / round(experimentInfo['frameRate'])
     else:
@@ -467,7 +499,7 @@ def StoreCurrentExperimentInfo(experimentInfo):
     _ioSession = '1'
     if 'session' in experimentInfo:
         _ioSession = str(experimentInfo['session'])
-    _ioServer = io.launchHubServer(window=window, **_ioConfig)
+    _ioServer = io.launchHubServer(window=_window, **_ioConfig)
     _eyetracker = None
 
     # create a default keyboard (e.g. to check for escape)
@@ -496,14 +528,23 @@ def InitialzeStimuli(window):
     global _resultTextBox
     global _resultText
     global _instructionsSoundInfo
+    global _examplesSoundInfo
+    global _stimulusSoundInfo
+    global _examplePauseInfo
 
     _fixation = CreateFixationStimulus(window)
     _fixationInfo = StimulusInfo(
         Type = StimulusType.NONE, 
         Duration = -1,
         WriteLog = False)
+    _examplePauseInfo = StimulusInfo(
+        Type = StimulusType.NONE, 
+        Duration = MS_TO_S * EXAMPLES_PAUSE,
+        WriteLog = False)
     _fixation = CreateFixationStimulus(window)
     _instructionsSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=True, Name='startInstruction', Duration=1000000)
+    _examplesSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=False, Name='examplesInstruction', Duration=-1)
+    _stimulusSoundInfo = StimulusInfo(StimulusType.NONE, WriteLog=False, Name='stimulusExample', Duration=MS_TO_S * STANDARD_TIME)
     _cyclePauseInfo = StimulusInfo(
         Type = StimulusType.NONE, 
         Duration = MS_TO_S * CYCLE_PAUSE,
@@ -513,15 +554,40 @@ def InitialzeStimuli(window):
     _resultText = CreateTextStimulus(window, ENTER_COUNT_TEXT)
     _resultText.pos = (0, 0.2)
 
+def CheckState(trialState):
+    return trialState != TrialState.TERMINATED and trialState != TrialState.ERROR
+
+def MinimizeWindow():
+    global _terminated
+    
+    if _terminated:
+        return
+
+    _window.winHandle.minimize() # minimise the PsychoPy window
+    _window.flip() # redraw the (minimised) window
+
+def MaximizeWindow():
+    global _terminated
+    
+    if _terminated:
+        return
+    _window.winHandle.maximize()
+    _window.winHandle.set_size(WINDOW_WIDTH, WINDOW_HEIGHT)
+    _window.winHandle.activate()
+    _window.flip()
+
 def RunOddball(stimuli, pauses, test=True):
     global _resultTextBox
     global _resultText
     global _fixationInfo
     global _instructionsSoundInfo
+    global _terminated
 
     results = []
     oddCount = 0
     type = "TEST" if test else "RUN"
+
+    MinimizeWindow()
 
     for i in range(CYCLES_NUMBER):
         oddCount = 0
@@ -529,7 +595,8 @@ def RunOddball(stimuli, pauses, test=True):
         # Cycle
         for j in range(STIMULUS_SERIES_NUMBER):
             stimulusInfo = stimuli[i][j]
-            print(f'{type}, Cycle #{i}, Trial #{j}, Type = {stimulusInfo.Type}, D1 = {stimulusInfo.Duration}, Pause Duration = {pauses[i][j].Duration}')
+            if not _terminated:
+                print(f'{type}, Cycle #{i}, Trial #{j}, Type = {stimulusInfo.Type}, D1 = {stimulusInfo.Duration}, Pause Duration = {pauses[i][j].Duration}')
             if stimulusInfo.Type == StimulusType.STANDARD:
                 sound = _standardSound
             else:
@@ -540,12 +607,17 @@ def RunOddball(stimuli, pauses, test=True):
 
         # Pause between cycles
         if not test:
-            RunTrial([_resultTextBox, _resultText], _fixationInfo, _enterCountIntrustions, _instructionsSoundInfo, True)
-            results.append((oddCount, _resultTextBox.text.strip()))
+            MaximizeWindow()
+            state = RunTrial([_resultTextBox, _resultText], _fixationInfo, _enterCountIntrustions, _instructionsSoundInfo, True)
+            userInput = _resultTextBox.text.strip() if CheckState(state) else '-'
+            results.append((oddCount, userInput))
             _resultTextBox.text = ''
+            MinimizeWindow()
         
         RunTrial(_fixation, _cyclePauseInfo, None, None)
     
+    MaximizeWindow()
+
     return results
 
 def PrintResultsToCsv(results, filename):
@@ -553,6 +625,31 @@ def PrintResultsToCsv(results, filename):
     writer = csv.writer(file, delimiter=';')
     writer.writerows([c[0], ','.join(c[1:])] for c in results)
     file.close()
+
+def RunExamples(mainText, mainTextInfo):
+    global _examplesSoundInfo
+    global _examplePauseInfo
+    global _standardAnnouncementIntrustions
+    global _oddAnnouncementIntrustions
+    global _fixationInfo
+    global _standardSound
+    global _oddSound
+    global _stimulusSoundInfo
+    global continueText
+
+    # Standard and odd examples
+    soundInfo = _examplesSoundInfo._replace(Duration = _standardAnnouncementIntrustions.getDuration())
+    RunTrial(_fixation, instructionsTextInfo, _standardAnnouncementIntrustions, soundInfo, True)
+    for i in range(NUMBER_OF_EXAMPLES):
+        RunTrial(standardExampleText, _examplePauseInfo, None, None)
+        RunTrial(standardExampleText, _fixationInfo, _standardSound, _stimulusSoundInfo)
+
+    soundInfo = _examplesSoundInfo._replace(Duration = _oddAnnouncementIntrustions.getDuration())
+    RunTrial(_fixation, instructionsTextInfo, _oddAnnouncementIntrustions, soundInfo)
+    for i in range(NUMBER_OF_EXAMPLES):
+        RunTrial(oddExampleText, _examplePauseInfo, None, None)
+        RunTrial(oddExampleText, _fixationInfo, _oddSound, _stimulusSoundInfo)
+
 
 # Main Scenario
 if __name__ == "__main__": 
@@ -576,7 +673,7 @@ if __name__ == "__main__":
     # Start Code - component code to be run after the window creation
 
     # --- Setup the Window ---
-    window = visual.Window(
+    _window = visual.Window(
         size=SCREEN_SIZE, 
         fullscr=False, 
         screen=SCREEN_NUMBER, 
@@ -587,28 +684,35 @@ if __name__ == "__main__":
         blendMode='avg', 
         useFBO=True, 
         units='height')
-    window.mouseVisible = False
+    _window.mouseVisible = False
     StoreCurrentExperimentInfo(experimentInfo)
     
-    startText = CreateTextStimulus(window, START_TEXT)
-    countText = CreateTextStimulus(window, COUNT_TEXT)
-    instructionsTextInfo = StimulusInfo(StimulusType.NONE, WriteLog=False)
-    photosensor = CreatePhotosensor(window)
-    InitialzeStimuli(window)
+    startText = CreateTextStimulus(_window, START_TEXT)
+    countText = CreateTextStimulus(_window, COUNT_TEXT)
+    standardExampleText = CreateTextStimulus(_window, STANDARD_EXAMPLE_TEXT)
+    oddExampleText = CreateTextStimulus(_window, ODD_EXAMPLE_TEXT)
+    continueText = CreateTextStimulus(_window, CONTINUE_TEXT)
+    instructionsTextInfo = StimulusInfo(StimulusType.NONE, 100000, WriteLog=False)
+    photosensor = CreatePhotosensor(_window)
+    InitialzeStimuli(_window)
     InitializeSounds()
 
-    # Show start instuctions
-    RunTrial(startText, instructionsTextInfo, _startInstructionsSound, _instructionsSoundInfo, True)
+    if (SHOW_TEST_BLOCK and not _terminated):
+        # Show start instuctions
+        RunTrial(startText, instructionsTextInfo, _startInstructionsSound, _instructionsSoundInfo, True)
 
-    # Run Test
-    RunOddball(testStimuliSequences, testPauseSequence)
+        # Run Test
+        RunOddball(testStimuliSequences, testPauseSequence)
 
-    # Show count instuctions
-    RunTrial(countText, instructionsTextInfo, _countIntructionsSound, _instructionsSoundInfo, True)
+    if (SHOW_MAIN_BLOCK and not _terminated):
+        #RunTrial(continueText, instructionsTextInfo, None, None, True)
+        RunExamples(countText, instructionsTextInfo)
+        # Show count instuctions
+        RunTrial(countText, instructionsTextInfo, _countIntructionsSound, _instructionsSoundInfo, True)
 
-    # Run Train
-    results = RunOddball(trainStimuliSequences, trainPauseSequence, False)
-    results.insert(0, ("odd_count", "user_input"))
+        # Run Train
+        results = RunOddball(trainStimuliSequences, trainPauseSequence, False)
+        results.insert(0, ("odd_count", "user_input"))
 
     print(results)
 
@@ -623,5 +727,5 @@ if __name__ == "__main__":
     if _eyetracker:
         _eyetracker.setConnectionState(False)
     thisExperiment.abort()  # or data files will save again on exit
-    window.close()
+    _window.close()
     core.quit()
