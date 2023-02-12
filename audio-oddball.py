@@ -11,6 +11,7 @@ If you publish work using this script the most relevant publication is:
 
 """
 
+
 # Import packages
 from psychopy import locale_setup
 from psychopy import prefs
@@ -30,12 +31,12 @@ import datetime
 
 from collections import namedtuple
 from enum import Enum
-import csv
+import csv 
 
 import psychopy.iohub as io
 from psychopy.hardware import keyboard
 
-SCREEN_NUMBER = 0
+SCREEN_NUMBER = 1
 WINDOW_WIDTH = 1024
 WINDOW_HEIGHT = 768
 SCREEN_SIZE = (WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -572,7 +573,7 @@ def MaximizeWindow():
     if _terminated:
         return
     _window.winHandle.maximize()
-    _window.winHandle.set_size(WINDOW_WIDTH, WINDOW_HEIGHT)
+    #_window.winHandle.set_size(WINDOW_WIDTH, WINDOW_HEIGHT)
     _window.winHandle.activate()
     _window.flip()
 
@@ -680,7 +681,7 @@ if __name__ == "__main__":
     # --- Setup the Window ---
     _window = visual.Window(
         size=SCREEN_SIZE, 
-        fullscr=False, 
+        fullscr=True, 
         screen=SCREEN_NUMBER, 
         winType='pyglet',
         allowStencil=False,
