@@ -33,6 +33,9 @@ from collections import namedtuple
 from enum import Enum
 import csv 
 
+import pyxid2
+import time
+
 import psychopy.iohub as io
 from psychopy.hardware import keyboard
 
@@ -83,6 +86,8 @@ STANDARD_START_LSL = 111
 STANDARD_END_LSL = 112
 ODD_START_LSL = 123
 ODD_END_LSL = 124
+CEDRUS_MASK_START = 2 ** 5
+CEDRUS_MASK_END = 2 ** 6
 
 # Colors
 BACKGROUND_COLOR = 'Black'
@@ -125,6 +130,8 @@ _examplePauseInfo = None
 _cyclePauseInfo = None
 _resultTextBox = None
 _resultText = None
+
+_cedrusDevice = None
 
 _terminated = False
  
@@ -210,6 +217,17 @@ def InitLslStream():
     # Initialize the stream.
     _lslOutlet = StreamOutlet(lslInfo)
 
+def InitCedrus():
+    return 0
+    
+    devices = pyxid2.get_xid_devices()
+    
+    device = devices[0] # get the first device to use
+    print(device)
+    device.reset_base_timer()
+    device.reset_rt_timer()
+
+    return device
 
 def InitSessionInfo(experimentName):
     # Store info about the experiment session
@@ -400,6 +418,7 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
                     thisExperiment.addData(soundStimulusInfo.Name +'.started', tThisFlipGlobal)
                 if soundStimulusInfo.LSLStart != -1:
                     _lslOutlet.push_sample(x=[soundStimulusInfo.LSLStart])
+                    _cedrusDevice.activate_line(bitmask=CEDRUS_MASK_START)
                 sound.play(when=_window)  # sync with win flip
             if sound.status == STARTED and time != -1:
                 # is it time to stop? (based on global clock, using actual start)
@@ -412,6 +431,7 @@ def RunTrial(texts, textStimulusInfo, sound, soundStimulusInfo, waitForInput=Fal
                         thisExperiment.timestampOnFlip(_window, soundStimulusInfo.Name +'.stopped')
                     if soundStimulusInfo.LSLEnd != -1:
                         _lslOutlet.push_sample(x=[soundStimulusInfo.LSLEnd])
+                    _cedrusDevice.activate_line(bitmask=CEDRUS_MASK_END)
                     sound.stop()
         
         # check for quit (typically the Esc key)
@@ -669,6 +689,7 @@ if __name__ == "__main__":
     psychopyVersion = '2022.2.4'
     experimentInfo = InitSessionInfo(experimentName)
     InitLslStream()
+    _cedrusDevice = InitCedrus()
 
     dataFilename = ShowStartDialog(experimentInfo, experimentName, psychopyVersion)
 
